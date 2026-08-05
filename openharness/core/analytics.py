@@ -1,3 +1,7 @@
+"""
+Analytics module for OpenHarness.
+Provides core functionality for the analytics subsystem.
+"""
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
 from openharness.core.types import Trajectory
