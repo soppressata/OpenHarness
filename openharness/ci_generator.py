@@ -1,7 +1,3 @@
-"""
-Ci Generator module for OpenHarness.
-Provides core functionality for the ci generator subsystem.
-"""
 def generate_github_actions_yaml(path=".github/workflows/eval.yml"):
     import os
     os.makedirs(os.path.dirname(path), exist_ok=True)
