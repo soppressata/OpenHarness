@@ -47,6 +47,14 @@ class PipelinePlan(BaseModel):
 # Alias for backward compatibility / QA test suite imports
 AIPipelineResult = PipelinePlan
 
+__all__ = [
+    "PipelineStage",
+    "ArchitectureDoc",
+    "PipelinePlan",
+    "AIPipelineResult",
+    "AIPipelineGenerator",
+]
+
 
 class AIPipelineGenerator:
     """Engine for generating AI-native deployment pipelines from declarative prompts."""
