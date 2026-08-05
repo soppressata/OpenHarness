@@ -75,6 +75,11 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
     def index():
         return HTML_DASHBOARD_TEMPLATE
 
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request, exc):
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(exc)})
+
     return app
 
 
