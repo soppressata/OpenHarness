@@ -1,3 +1,7 @@
+"""
+Types module for OpenHarness.
+Provides core functionality for the types subsystem.
+"""
 import time
 import uuid
 from typing import Any, Dict, List, Optional, Union
