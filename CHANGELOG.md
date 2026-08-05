@@ -1,3 +1,4 @@
+- **Feature**: Add GitHub Actions CI template generator (Issue #32)
 - **Feature**: Add OpenAI-compatible scoring judge (Issue #31)
 - **Feature**: Export dashboard as static HTML snapshot (Issue #29)
 - **Feature**: Add CLI command for batch evaluation replay (Issue #28)
