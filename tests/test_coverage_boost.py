@@ -47,7 +47,7 @@ class MockLLMProvider(BaseProvider):
         if self.should_fail:
             raise RuntimeError("LLM Failure simulated")
         return ProviderResponse(
-            content='{"score": 0.9, "passed": true, "reason": "Great job"}',
+            content='{"score": 0.9, "passed": true, "reason": "Great job", "winner": "A"}',
             prompt_tokens=10,
             completion_tokens=20,
             model="mock-model"
@@ -55,6 +55,9 @@ class MockLLMProvider(BaseProvider):
 
     async def agenerate(self, prompt: str, system_prompt=None, temperature=0.0, max_tokens=1000, **kwargs):
         return self.generate(prompt, system_prompt, temperature, max_tokens, **kwargs)
+
+    def check_connection(self) -> bool:
+        return True
 
 
 def test_types_methods():
@@ -101,7 +104,7 @@ def test_harness_decorator_and_exceptions(tmp_path):
 
 def test_llm_judge_evaluators():
     mock_prov = MockLLMProvider()
-    judge_fn = llm_judge(rubric="Polite response", provider=mock_prov)
+    judge_fn = llm_judge(rubric="Polite response", model=mock_prov)
     
     score_str = judge_fn("Plain string response")
     assert score_str.passed is True
@@ -111,18 +114,18 @@ def test_llm_judge_evaluators():
     assert score.passed is True
     assert score.score == 0.9
 
-    arena_fn = pairwise_arena_judge(rubric="Best response", provider=mock_prov)
-    score_arena = arena_fn(traj, traj)
+    score_arena = pairwise_arena_judge(rubric="Best response", output_a="A", output_b="B", model=mock_prov)
+    assert score_arena.passed is True
     assert score_arena.category == "llm_judge"
 
     failing_prov = MockLLMProvider(should_fail=True)
-    failing_judge = llm_judge(rubric="r", provider=failing_prov)
+    failing_judge = llm_judge(rubric="r", model=failing_prov)
     res_fail = failing_judge(traj)
     assert res_fail.passed is False
 
-    failing_arena = pairwise_arena_judge(rubric="r", provider=failing_prov)
-    res_arena_fail = failing_arena(traj, traj)
-    assert res_arena_fail.score == 0.5
+    res_fail_arena = pairwise_arena_judge(rubric="r", output_a="A", output_b="B", model=failing_prov)
+    assert res_fail_arena.passed is False
+    assert res_fail_arena.score == 0.0
 
 
 def test_assertions_comprehensive():

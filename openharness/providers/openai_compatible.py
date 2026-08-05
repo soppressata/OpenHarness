@@ -5,7 +5,7 @@ from openharness.providers.base import BaseProvider, ProviderResponse
 
 
 class OpenAICompatibleProvider(BaseProvider):
-    """Universal Provider for OpenAI-compatible APIs (OpenAI, vLLM, llama.cpp, LocalAI, Groq, OpenRouter, etc.)."""
+    """Universal Provider for OpenAI-compatible APIs (OpenAI, vLLM, llama.cpp, LocalAI, Groq, OpenRouter, Mistral, etc.)."""
 
     def __init__(
         self,
@@ -22,6 +22,15 @@ class OpenAICompatibleProvider(BaseProvider):
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
+
+    def check_connection(self) -> bool:
+        """Ping models endpoint to check API connectivity."""
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                resp = client.get(f"{self.base_url}/models", headers=self._headers())
+                return resp.status_code in [200, 401]  # 200 OK or 401 Unauthorized means host is reachable
+        except Exception:
+            return False
 
     def generate(
         self,

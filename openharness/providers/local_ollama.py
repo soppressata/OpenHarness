@@ -10,6 +10,15 @@ class OllamaProvider(BaseProvider):
         self.model = model
         self.base_url = base_url.rstrip("/")
 
+    def check_connection(self) -> bool:
+        """Ping Ollama API tags endpoint to check connectivity."""
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                resp = client.get(f"{self.base_url}/api/tags")
+                return resp.status_code == 200
+        except Exception:
+            return False
+
     def generate(
         self,
         prompt: str,
@@ -44,7 +53,6 @@ class OllamaProvider(BaseProvider):
                     metadata={"provider": "ollama", "done_reason": data.get("done_reason")}
                 )
         except Exception as e:
-            # Fallback or informative error
             raise RuntimeError(f"Ollama generation failed ({self.base_url}, model={self.model}): {str(e)}") from e
 
     async def agenerate(

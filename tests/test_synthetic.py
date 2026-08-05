@@ -12,6 +12,9 @@ class MockGenProvider(BaseProvider):
     async def agenerate(self, prompt: str, **kwargs):
         return self.generate(prompt, **kwargs)
 
+    def check_connection(self):
+        return True
+
 
 def test_generate_synthetic_dataset():
     prov = MockGenProvider()

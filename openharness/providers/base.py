@@ -37,3 +37,8 @@ class BaseProvider(ABC):
     ) -> ProviderResponse:
         """Generate response from the model asynchronously."""
         pass
+
+    @abstractmethod
+    def check_connection(self) -> bool:
+        """Verify endpoint connectivity and model availability."""
+        pass
