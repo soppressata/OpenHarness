@@ -136,3 +136,79 @@ if __name__ == "__main__":
         else:
             print(output_str)
         return 0
+
+
+"""
+Cli module for OpenHarness.
+Provides core functionality for the cli subsystem.
+"""
+from typing import Optional
+import click
+from local_agent_sandbox.core import LocalAgentSandbox, SandboxConfig
+from local_agent_sandbox.pipeline_generator import AIPipelineGenerator
+
+
+@click.group()
+@click.version_option(version="0.1.0")
+def cli():
+    """LocalAgentSandbox CLI - Sub-10ms Local Process Isolation for AI Coding Agents."""
+    pass
+
+
+# Alias for entry point / test imports
+main = cli
+
+
+@cli.command()
+@click.argument("command")
+@click.option("--timeout", default=30.0, help="Maximum execution timeout in seconds.")
+@click.option("--dir", default=None, help="Custom sandbox directory path.")
+def run(command: str, timeout: float, dir: str):
+    """Run a bash command inside isolated local sandbox."""
+    config = SandboxConfig(max_timeout_seconds=timeout)
+    sandbox = LocalAgentSandbox(config=config, sandbox_dir=dir)
+
+    click.echo(f"⚡ Executing inside sandbox: '{command}'")
+    result = sandbox.execute(command)
+
+    if result.blocked:
+        click.secho(f"❌ BLOCKED: {result.stderr}", fg="red", bold=True)
+    else:
+        color = "green" if result.exit_code == 0 else "red"
+        click.secho(f"Exit Code: {result.exit_code} ({result.duration_ms:.1f}ms)", fg=color, bold=True)
+        if result.stdout:
+            click.echo(result.stdout)
+        if result.stderr:
+            click.secho(result.stderr, fg="yellow")
+
+    sandbox.cleanup()
+
+
+@cli.command("ai-generate")
+@click.argument("prompt", required=False, default=None)
+@click.option("--prompt", "-p", "prompt_opt", default=None, help="Natural language deployment prompt.")
+@click.option("--output", "-o", default=None, help="Output file path to save execution plan.")
+def ai_generate(prompt: Optional[str] = None, prompt_opt: Optional[str] = None, output: Optional[str] = None) -> None:
+    """Generate an AI-driven CD pipeline execution plan and architecture documentation."""
+    target_prompt = prompt_opt or prompt
+    if not target_prompt:
+        click.secho("Error: Missing prompt for AI pipeline generation.", fg="red", err=True)
+        raise click.UsageError("Prompt argument or --prompt option is required.")
+
+    generator = AIPipelineGenerator()
+    plan = generator.generate(target_prompt)
+    plan_json = plan.to_json(indent=2)
+
+    click.echo(plan_json)
+
+    if output:
+        try:
+            with open(output, "w", encoding="utf-8") as f:
+                f.write(plan_json)
+            click.secho(f"Successfully saved pipeline plan to '{output}'", fg="green")
+        except Exception as e:
+            click.secho(f"Failed to write output to '{output}': {e}", fg="red", err=True)
+
+
+if __name__ == "__main__":
+    cli()

@@ -1,79 +1,78 @@
 """
-Unit tests for AI Pipeline Generator CLI ('lasb ai-generate') and Engine.
+Tests for AI Pipeline Generation CLI and generator module.
 """
 
 import json
-from local_agent_sandbox.cli import main as cli_main
-from local_agent_sandbox.pipeline_generator import AIPipelineGenerator, AIPipelineResult
+import pytest
+from click.testing import CliRunner
+from local_agent_sandbox.cli import cli, main as cli_main
+from local_agent_sandbox.pipeline_generator import AIPipelineGenerator, PipelinePlan
 
 
-def test_pipeline_generator_direct():
-    generator = AIPipelineGenerator(provider="google")
+def test_import_main_alias():
+    """Verify cli module exports main as an alias for cli."""
+    assert cli_main is cli
+
+
+def test_generator_direct_invocation():
+    """Test AIPipelineGenerator directly."""
+    generator = AIPipelineGenerator()
     prompt = "Deploy microservice X to AWS with 99.99% uptime, keeping costs under $500/mo"
-    result = generator.generate_pipeline(prompt)
+    plan = generator.generate(prompt)
 
-    assert isinstance(result, AIPipelineResult)
-    assert result.target_state == prompt
-    assert result.execution_plan.sla_target == "99.99% uptime"
-    assert result.execution_plan.cost_limit == "$500/mo"
-    assert len(result.execution_plan.steps) == 5
-
-    arch = result.architecture_documentation
-    assert "Compute Layer" in arch.topology
-    assert "SLA Target" in arch.resilience
-    assert "Budget Limit" in arch.cost_optimization
-    assert "Zero-Trust Mesh" in arch.security_baseline
+    assert isinstance(plan, PipelinePlan)
+    assert plan.prompt == prompt
+    assert "AWS" in plan.target_environment
+    assert len(plan.stages) >= 3
+    assert plan.architecture_doc.title is not None
+    assert "99.99% uptime" in str(plan.architecture_doc.constraints)
+    assert "$500/month" in str(plan.architecture_doc.constraints)
 
 
-def test_cli_ai_generate_text_output(capsys):
-    ret = cli_main(["ai-generate", "Deploy microservice billing to AWS with 99.9% uptime, keeping costs under $200/mo"])
-    assert ret == 0
+def test_cli_ai_generate_positional_argument():
+    """Test ai-generate CLI command with positional prompt argument."""
+    runner = CliRunner()
+    result = runner.invoke(cli_main, ["ai-generate", "Deploy microservice X to AWS"])
 
-    captured = capsys.readouterr()
-    assert "OpenHarness AI Pipeline Execution Plan" in captured.out
-    assert "Pipeline ID:" in captured.out
-    assert "Deploy microservice billing to AWS" in captured.out
-    assert "Foundational Architecture Documentation" in captured.out
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["prompt"] == "Deploy microservice X to AWS"
+    assert "stages" in data
+    assert "architecture_doc" in data
 
 
-def test_cli_ai_generate_json_output(capsys):
-    ret = cli_main(["ai-generate", "--prompt", "Deploy auth service to GCP", "--json"])
-    assert ret == 0
+def test_cli_ai_generate_option():
+    """Test ai-generate CLI command with --prompt option."""
+    runner = CliRunner()
+    result = runner.invoke(cli_main, ["ai-generate", "--prompt", "Deploy to GCP with Docker"])
 
-    captured = capsys.readouterr()
-    data = json.loads(captured.out)
-
-    assert data["target_state"] == "Deploy auth service to GCP"
-    assert "execution_plan" in data
-    assert "architecture_documentation" in data
-    assert len(data["execution_plan"]["steps"]) > 0
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["prompt"] == "Deploy to GCP with Docker"
+    assert "GCP" in data["target_environment"]
 
 
 def test_cli_ai_generate_output_file(tmp_path):
-    out_file = tmp_path / "pipeline_plan.json"
-    ret = cli_main(["ai-generate", "Deploy search worker to Azure", "--json", "-o", str(out_file)])
-    assert ret == 0
+    """Test ai-generate CLI command with output file parameter."""
+    runner = CliRunner()
+    output_file = tmp_path / "plan.json"
+    result = runner.invoke(cli_main, [
+        "ai-generate",
+        "Deploy to Kubernetes cluster",
+        "--output", str(output_file)
+    ])
 
-    assert out_file.exists()
-    content = out_file.read_text(encoding="utf-8")
-    data = json.loads(content)
-    assert data["target_state"] == "Deploy search worker to Azure"
-    assert "execution_plan" in data
-
-
-def test_cli_ai_generate_missing_prompt(capsys):
-    ret = cli_main(["ai-generate"])
-    assert ret == 1
-
-    captured = capsys.readouterr()
-    assert "Error: A natural language prompt is required" in captured.err
+    assert result.exit_code == 0
+    assert output_file.exists()
+    file_content = json.loads(output_file.read_text())
+    assert file_content["prompt"] == "Deploy to Kubernetes cluster"
+    assert "Kubernetes" in file_content["target_environment"]
 
 
-def test_cli_ai_generate_with_provider_and_flag(capsys):
-    ret = cli_main(["ai-generate", "-p", "Deploy payment service to AWS", "--provider", "openai", "--json"])
-    assert ret == 0
+def test_cli_ai_generate_missing_prompt():
+    """Test ai-generate CLI command with missing prompt."""
+    runner = CliRunner()
+    result = runner.invoke(cli_main, ["ai-generate"])
 
-    captured = capsys.readouterr()
-    data = json.loads(captured.out)
-    assert data["target_state"] == "Deploy payment service to AWS"
-    assert "openai" in data["provider"]
+    assert result.exit_code != 0
+    assert "Missing prompt" in result.output or "Error" in result.output
