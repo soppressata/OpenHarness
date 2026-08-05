@@ -106,6 +106,7 @@ class SelfHealingSandbox:
         start_time = time.time()
         sandbox = self.provision_sandbox()
         sandbox_id = sandbox.id
+        self.apply_patch(sandbox, patch)
         output_lines = [
             f"[Provisioning] Provisioned environment and sandbox {sandbox_id} for patch {patch.patch_id}.",
             f"[Patch] Staged patched code of {patch.target_file} into virtual filesystem.",

@@ -104,17 +104,30 @@ def _generate_heuristic_response(provider: str, prompt: str, error: Optional[str
 
 
 class BaseProviderAdapter(ABC):
-    """Abstract Base Class for LLM Provider Adapters."""
+    """Base Class for LLM Provider Adapters.
 
-    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, timeout: int = 30):
+    Concrete adapters installed through the factory or via direct instantiation
+    (e.g. a third-party adapter wired into ``PatchGeneratorAgent``) should
+    override ``get_provider_name``. The base class stores the adapter name so
+    that ``get_provider_name`` remains usable even when adapters are custom-built
+    outside this module.
+    """
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        timeout: int = 30,
+        provider_name: Optional[str] = None,
+    ):
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
+        self.provider_name = provider_name
 
-    @abstractmethod
     def get_provider_name(self) -> str:
         """Return the provider name string."""
-        pass
+        return self.provider_name or self.__class__.__name__
 
     @abstractmethod
     def generate_completion(self, prompt: str, system_prompt: Optional[str] = None) -> str:
