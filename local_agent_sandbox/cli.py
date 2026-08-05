@@ -212,3 +212,14 @@ def ai_generate(prompt: Optional[str] = None, prompt_opt: Optional[str] = None, 
 
 if __name__ == "__main__":
     cli()
+
+
+# AI Pipeline Generation command group
+    gen_parser = subparsers.add_parser("ai-generate", help="Generate AI deployment pipeline execution plan and architecture docs")
+    gen_parser.add_argument("prompt", type=str, nargs="?", default="", help="Natural language prompt describing desired deployment state")
+    gen_parser.add_argument("-p", "--prompt", dest="prompt_flag", type=str, help="Alternative flag for natural language prompt")
+    gen_parser.add_argument("--provider", type=str, default="google", choices=["google", "openai", "anthropic"], help="LLM Provider adapter")
+    gen_parser.add_argument("--model", type=str, default=None, help="LLM model name")
+    gen_parser.add_argument("--api-key", type=str, default=None, help="API key for LLM provider")
+    gen_parser.add_argument("--json", action="store_true", help="Output execution plan and architecture docs in JSON format")
+    gen_parser.add_argument("-o", "--output", type=str, help="File path to save the generated execution plan")
