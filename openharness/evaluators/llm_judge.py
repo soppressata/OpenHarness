@@ -1,3 +1,7 @@
+"""
+Llm Judge module for OpenHarness.
+Provides core functionality for the llm judge subsystem.
+"""
 import json
 import re
 from typing import Callable, Union, Optional, Dict
