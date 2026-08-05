@@ -1,3 +1,7 @@
+"""
+Storage module for OpenHarness.
+Provides core functionality for the storage subsystem.
+"""
 import json
 import os
 import sqlite3

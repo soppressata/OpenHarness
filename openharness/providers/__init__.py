@@ -1,3 +1,7 @@
+"""
+  Init   module for OpenHarness.
+Provides core functionality for the   init   subsystem.
+"""
 from typing import Optional, Union, Dict
 from openharness.providers.base import BaseProvider, ProviderResponse
 from openharness.providers.local_ollama import OllamaProvider

@@ -1,3 +1,7 @@
+"""
+Llamaindex module for OpenHarness.
+Provides core functionality for the llamaindex subsystem.
+"""
 from typing import Any, Dict, Optional
 from openharness.core.types import Trajectory, Step, ToolCall
 

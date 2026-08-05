@@ -1,3 +1,7 @@
+"""
+Synthetic module for OpenHarness.
+Provides core functionality for the synthetic subsystem.
+"""
 import json
 import re
 from typing import List, Optional, Union

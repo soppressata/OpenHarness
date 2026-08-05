@@ -1,3 +1,7 @@
+"""
+Local Ollama module for OpenHarness.
+Provides core functionality for the local ollama subsystem.
+"""
 import httpx
 from typing import Optional, Dict, Any
 from openharness.providers.base import BaseProvider, ProviderResponse

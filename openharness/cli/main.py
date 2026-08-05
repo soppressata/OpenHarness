@@ -1,3 +1,7 @@
+"""
+Main module for OpenHarness.
+Provides core functionality for the main subsystem.
+"""
 import os
 import sys
 import click

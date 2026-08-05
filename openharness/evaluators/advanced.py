@@ -1,3 +1,7 @@
+"""
+Advanced module for OpenHarness.
+Provides core functionality for the advanced subsystem.
+"""
 from typing import Callable, List, Dict, Any
 from openharness.core.types import MetricScore, Trajectory
 

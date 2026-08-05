@@ -1,3 +1,7 @@
+"""
+Assertions module for OpenHarness.
+Provides core functionality for the assertions subsystem.
+"""
 import re
 import json
 from typing import Any, Callable, Dict, List, Optional, Union

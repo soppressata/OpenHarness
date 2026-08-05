@@ -1,3 +1,7 @@
+"""
+Quality module for OpenHarness.
+Provides core functionality for the quality subsystem.
+"""
 import ast
 import re
 from typing import Callable, List, Dict, Any, Optional, Union

@@ -1,3 +1,7 @@
+"""
+Openai Compatible module for OpenHarness.
+Provides core functionality for the openai compatible subsystem.
+"""
 import os
 import httpx
 from typing import Optional, Dict, Any

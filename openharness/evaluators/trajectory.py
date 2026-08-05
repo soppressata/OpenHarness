@@ -1,3 +1,7 @@
+"""
+Trajectory module for OpenHarness.
+Provides core functionality for the trajectory subsystem.
+"""
 from typing import Callable, List, Optional, Dict, Any
 from openharness.core.types import MetricScore, Trajectory
 

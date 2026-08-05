@@ -1,3 +1,7 @@
+"""
+Dataset module for OpenHarness.
+Provides core functionality for the dataset subsystem.
+"""
 import json
 import csv
 import os

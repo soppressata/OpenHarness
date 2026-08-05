@@ -1,3 +1,7 @@
+"""
+Judge module for OpenHarness.
+Provides core functionality for the judge subsystem.
+"""
 class OpenAIScoringJudge:
     def __init__(self, endpoint="https://api.openai.com/v1", model="gpt-4"):
         self.endpoint = endpoint

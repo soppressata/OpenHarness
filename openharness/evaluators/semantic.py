@@ -1,3 +1,7 @@
+"""
+Semantic module for OpenHarness.
+Provides core functionality for the semantic subsystem.
+"""
 import math
 import re
 from typing import Callable, List, Optional, Union, Dict, Any

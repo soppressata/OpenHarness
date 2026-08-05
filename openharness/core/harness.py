@@ -1,3 +1,7 @@
+"""
+Harness module for OpenHarness.
+Provides core functionality for the harness subsystem.
+"""
 import asyncio
 import functools
 import inspect
