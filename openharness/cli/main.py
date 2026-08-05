@@ -192,3 +192,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def replay_batch(run_id):
+    print(f"Replaying run {run_id}...")
+    return True
