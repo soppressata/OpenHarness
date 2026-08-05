@@ -1,3 +1,7 @@
+"""
+Experiment module for OpenHarness.
+Provides core functionality for the experiment subsystem.
+"""
 from typing import Any, Callable, Dict, List, Optional
 from pydantic import BaseModel
 from openharness.core.dataset import Dataset
