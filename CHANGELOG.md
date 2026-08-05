@@ -1,3 +1,4 @@
+- **Feature**: Export dashboard as static HTML snapshot (Issue #29)
 - **Feature**: Add CLI command for batch evaluation replay (Issue #28)
 - **Feature**: Omniverse Deployment Graph: Intelligent Multi-Cloud & Edge Orchestration Engine (Issue #26)
 # Changelog
