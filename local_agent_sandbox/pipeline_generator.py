@@ -41,17 +41,67 @@ class AIPipelineResult(BaseModel):
     execution_plan: ExecutionPlan
     architecture_documentation: ArchitectureDocumentation
 
+    def to_dict(self) -> dict:
+        """Convert result to dictionary representation."""
+        if hasattr(self, "model_dump"):
+            return self.model_dump()
+        return self.dict()
+
+    def format_text(self) -> str:
+        """Format the result as human-readable CLI text output."""
+        lines = []
+        lines.append("=" * 80)
+        lines.append("🚀 OpenHarness AI Pipeline Execution Plan")
+        lines.append("=" * 80)
+        lines.append(f"Pipeline ID:   {self.pipeline_id}")
+        lines.append(f"Target State:  {self.target_state}")
+        lines.append(f"Provider:      {self.provider}")
+        lines.append(f"SLA Target:    {self.execution_plan.sla_target}")
+        lines.append(f"Cost Limit:    {self.execution_plan.cost_limit}")
+        lines.append("")
+        lines.append("-" * 80)
+        lines.append("📋 Execution Plan Steps")
+        lines.append("-" * 80)
+        for s in self.execution_plan.steps:
+            lines.append(f" {s.id:2d}. [{s.name}] {s.action}")
+        lines.append("")
+        lines.append("-" * 80)
+        lines.append("🏗️ Foundational Architecture Documentation")
+        lines.append("-" * 80)
+        lines.append("### 1. Topology & Infrastructure")
+        lines.append(self.architecture_documentation.topology)
+        lines.append("")
+        lines.append("### 2. Resilience & Self-Healing Strategy")
+        lines.append(self.architecture_documentation.resilience)
+        lines.append("")
+        lines.append("### 3. Cost Optimization Controls")
+        lines.append(self.architecture_documentation.cost_optimization)
+        lines.append("")
+        lines.append("### 4. Security & Compliance Baseline")
+        lines.append(self.architecture_documentation.security_baseline)
+        lines.append("=" * 80)
+        return "\n".join(lines)
+
 
 class AIPipelineGenerator:
     """AI Pipeline Generation Engine for synthesizing deployment execution plans."""
 
-    def __init__(self, provider: str = "google"):
+    def __init__(
+        self,
+        provider: str = "google",
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+    ):
         """Initialize the generator with an AI provider.
         
         Args:
             provider: AI provider name (e.g. 'google', 'openai', 'anthropic').
+            api_key: Optional API key for provider.
+            model: Optional model name.
         """
         self.provider = provider
+        self.api_key = api_key
+        self.model = model
 
     def _extract_sla_target(self, prompt: str) -> str:
         """Extract SLA target string from prompt or return default."""

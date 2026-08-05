@@ -69,6 +69,7 @@ class MetricScore(BaseModel):
 
 class TestCase(BaseModel):
     """A benchmark test case used to evaluate an agent."""
+    __test__ = False
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     name: str
     input: Union[str, Dict[str, Any]]
