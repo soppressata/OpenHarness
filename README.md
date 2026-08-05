@@ -71,6 +71,21 @@ harness ui
 
 ---
 
+## 🤖 GitHub Actions CI
+
+Wire OpenHarness into your GitHub Actions pipeline in one command:
+
+```bash
+harness init --ci github
+```
+
+This scaffolds `.github/workflows/eval.yml` with a workflow that installs
+OpenHarness, runs your eval suite, caches pip & eval state, and uploads the
+generated `report.html` as a downloadable build artifact (retained 14 days).
+Commit the file and push — evals run on every push and pull request.
+
+---
+
 ## 📘 Quickstart (TypeScript / Node)
 
 ```bash
@@ -114,6 +129,7 @@ await harness.runCase(
   - `harness report`: Print terminal summary of past runs & scorecards.
   - `harness ui`: Start the FastAPI web dashboard.
   - `harness init`: Initialize a boilerplate evaluation script.
+  - `harness init --ci github`: Scaffold a GitHub Actions CI workflow template.
 
 ---
 

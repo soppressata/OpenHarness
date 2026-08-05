@@ -1,7 +1,11 @@
 import json
+import os
+
+import pytest
 from click.testing import CliRunner
 from openharness.cli.main import cli
 from openharness import Harness, assert_exact_match
+from openharness.ci_generator import generate_ci_template
 
 
 def test_cli_report_empty(tmp_path):
@@ -34,12 +38,6 @@ def test_cli_viz_command(tmp_path):
     # Invalid run_id viz
     res_err = runner.invoke(cli, ["viz", "--run-id", "invalid_id", "--db", db_file])
     assert res_err.exit_code != 0
-
-
-import os
-import pytest
-from click.testing import CliRunner
-from local_agent_sandbox.cli import cli, generate_ci_template
 
 
 def test_cli_run_command():
