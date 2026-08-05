@@ -5,7 +5,7 @@ from openharness.providers.base import BaseProvider, ProviderResponse
 
 
 class OpenAICompatibleProvider(BaseProvider):
-    """Universal Provider for OpenAI-compatible APIs (OpenAI, vLLM, llama.cpp, LocalAI, Groq, OpenRouter, Mistral, etc.)."""
+    """Universal Provider for OpenAI-compatible APIs with Prompt Caching & Adaptive Effort Control."""
 
     def __init__(
         self,
@@ -24,11 +24,10 @@ class OpenAICompatibleProvider(BaseProvider):
         return headers
 
     def check_connection(self) -> bool:
-        """Ping models endpoint to check API connectivity."""
         try:
             with httpx.Client(timeout=5.0) as client:
                 resp = client.get(f"{self.base_url}/models", headers=self._headers())
-                return resp.status_code in [200, 401]  # 200 OK or 401 Unauthorized means host is reachable
+                return resp.status_code in [200, 401]
         except Exception:
             return False
 
@@ -38,6 +37,8 @@ class OpenAICompatibleProvider(BaseProvider):
         system_prompt: Optional[str] = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
+        use_cache: bool = True,
+        effort: str = "low",
         **kwargs
     ) -> ProviderResponse:
         url = f"{self.base_url}/chat/completions"
@@ -46,12 +47,18 @@ class OpenAICompatibleProvider(BaseProvider):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        token_limit = 250 if effort == "low" else max_tokens
+
         payload = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": max_tokens
+            "max_tokens": token_limit
         }
+        
+        # OpenRouter / OpenAI prompt caching controls if supported
+        if use_cache:
+            payload["prompt_cache"] = True
 
         try:
             with httpx.Client(timeout=60.0) as client:
@@ -60,12 +67,14 @@ class OpenAICompatibleProvider(BaseProvider):
                 data = resp.json()
                 choice = data["choices"][0]
                 usage = data.get("usage", {})
+                cached_tokens = usage.get("prompt_tokens_details", {}).get("cached_tokens", 0)
                 return ProviderResponse(
                     content=choice["message"]["content"] or "",
                     prompt_tokens=usage.get("prompt_tokens", 0),
                     completion_tokens=usage.get("completion_tokens", 0),
+                    cached_tokens=cached_tokens,
                     model=self.model,
-                    metadata={"provider": "openai_compatible", "finish_reason": choice.get("finish_reason")}
+                    metadata={"provider": "openai_compatible", "finish_reason": choice.get("finish_reason"), "effort": effort}
                 )
         except Exception as e:
             raise RuntimeError(f"OpenAI-compatible generation failed ({self.base_url}, model={self.model}): {str(e)}") from e
@@ -76,6 +85,8 @@ class OpenAICompatibleProvider(BaseProvider):
         system_prompt: Optional[str] = None,
         temperature: float = 0.0,
         max_tokens: int = 1000,
+        use_cache: bool = True,
+        effort: str = "low",
         **kwargs
     ) -> ProviderResponse:
         url = f"{self.base_url}/chat/completions"
@@ -84,12 +95,16 @@ class OpenAICompatibleProvider(BaseProvider):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        token_limit = 250 if effort == "low" else max_tokens
+
         payload = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": max_tokens
+            "max_tokens": token_limit
         }
+        if use_cache:
+            payload["prompt_cache"] = True
 
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
@@ -98,12 +113,14 @@ class OpenAICompatibleProvider(BaseProvider):
                 data = resp.json()
                 choice = data["choices"][0]
                 usage = data.get("usage", {})
+                cached_tokens = usage.get("prompt_tokens_details", {}).get("cached_tokens", 0)
                 return ProviderResponse(
                     content=choice["message"]["content"] or "",
                     prompt_tokens=usage.get("prompt_tokens", 0),
                     completion_tokens=usage.get("completion_tokens", 0),
+                    cached_tokens=cached_tokens,
                     model=self.model,
-                    metadata={"provider": "openai_compatible", "finish_reason": choice.get("finish_reason")}
+                    metadata={"provider": "openai_compatible", "finish_reason": choice.get("finish_reason"), "effort": effort}
                 )
         except Exception as e:
             raise RuntimeError(f"OpenAI-compatible async generation failed ({self.base_url}, model={self.model}): {str(e)}") from e
