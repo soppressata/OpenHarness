@@ -99,3 +99,40 @@ def main(args: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# AI Pipeline Generation command group
+    gen_parser = subparsers.add_parser("ai-generate", help="Generate AI deployment pipeline execution plan and architecture docs")
+    gen_parser.add_argument("prompt", type=str, nargs="?", default="", help="Natural language prompt describing desired deployment state")
+    gen_parser.add_argument("-p", "--prompt", dest="prompt_flag", type=str, help="Alternative flag for natural language prompt")
+    gen_parser.add_argument("--provider", type=str, default="google", choices=["google", "openai", "anthropic"], help="LLM Provider adapter")
+    gen_parser.add_argument("--model", type=str, default=None, help="LLM model name")
+    gen_parser.add_argument("--api-key", type=str, default=None, help="API key for LLM provider")
+    gen_parser.add_argument("--json", action="store_true", help="Output execution plan and architecture docs in JSON format")
+    gen_parser.add_argument("-o", "--output", type=str, help="File path to save the generated execution plan")
+
+    # Command execution handler inside main()
+    elif parsed.subcommand == "ai-generate":
+        prompt = getattr(parsed, "prompt", None) or getattr(parsed, "prompt_flag", None)
+        if not prompt:
+            print("Error: A natural language prompt is required.", file=sys.stderr)
+            return 1
+        generator = AIPipelineGenerator(
+            provider=getattr(parsed, "provider", "google"),
+            api_key=getattr(parsed, "api_key", None),
+            model=getattr(parsed, "model", None),
+        )
+        result = generator.generate_pipeline(prompt)
+        if getattr(parsed, "json", False):
+            output_str = json.dumps(result.to_dict(), indent=2)
+        else:
+            output_str = result.format_text()
+
+        output_path = getattr(parsed, "output", None)
+        if output_path:
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(output_str)
+            print(f"Pipeline generation plan saved to {output_path}")
+        else:
+            print(output_str)
+        return 0

@@ -1,5 +1,5 @@
 """
-Unit tests for AI Pipeline Generator CLI ('ai-generate') and Engine.
+Unit tests for AI Pipeline Generator CLI ('lasb ai-generate') and Engine.
 """
 
 import json
