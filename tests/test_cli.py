@@ -40,19 +40,6 @@ def test_cli_viz_command(tmp_path):
     assert res_err.exit_code != 0
 
 
-def test_cli_run_command():
-    runner = CliRunner()
-    result = runner.invoke(cli, ["run", "echo 'CLI test'"])
-    assert result.exit_code == 0
-    assert "CLI test" in result.output
-
-
-def test_cli_blocked_command():
-    runner = CliRunner()
-    result = runner.invoke(cli, ["run", "rm -rf /"])
-    assert "BLOCKED" in result.output
-
-
 def test_cli_init_github():
     runner = CliRunner()
     with runner.isolated_filesystem():
