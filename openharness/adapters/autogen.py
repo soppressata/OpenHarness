@@ -1,3 +1,7 @@
+"""
+Autogen module for OpenHarness.
+Provides core functionality for the autogen subsystem.
+"""
 from typing import Any, Dict, List
 from openharness.core.types import Trajectory, Step, ToolCall
 
