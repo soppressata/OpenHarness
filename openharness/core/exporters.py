@@ -1,3 +1,7 @@
+"""
+OpenHarness Exporter Module
+Exports evaluation runs to JSON, single-file HTML, and JUnit XML formats.
+"""
 import json
 import xml.etree.ElementTree as ET
 from typing import Dict, Any, Optional
