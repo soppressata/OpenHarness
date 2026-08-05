@@ -1,3 +1,7 @@
+"""
+Base module for OpenHarness.
+Provides core functionality for the base subsystem.
+"""
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
