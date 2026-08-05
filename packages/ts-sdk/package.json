@@ -1,0 +1,25 @@
+{
+  "name": "@openharness/core",
+  "version": "0.1.0",
+  "description": "Zero-cost, local-first evaluation harness for Agentic AI workflows in Node & TypeScript.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 0"
+  },
+  "keywords": [
+    "evals",
+    "agent",
+    "braintrust",
+    "langsmith",
+    "langfuse",
+    "openharness",
+    "typescript"
+  ],
+  "author": "OpenHarness Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
