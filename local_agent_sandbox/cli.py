@@ -334,3 +334,125 @@ def main(args: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+"""
+Cli module for OpenHarness.
+Provides core functionality for the cli subsystem.
+"""
+import sys
+import json
+import click
+from typing import List, Optional
+from local_agent_sandbox.core import LocalAgentSandbox, SandboxConfig
+from local_agent_sandbox.pipeline_generator import AIPipelineGenerator
+
+
+@click.group()
+@click.version_option(version="0.1.0")
+def cli():
+    """LocalAgentSandbox CLI - Sub-10ms Local Process Isolation for AI Coding Agents."""
+    pass
+
+
+@cli.command()
+@click.argument("command")
+@click.option("--timeout", default=30.0, help="Maximum execution timeout in seconds.")
+@click.option("--dir", default=None, help="Custom sandbox directory path.")
+def run(command: str, timeout: float, dir: str):
+    """Run a bash command inside isolated local sandbox."""
+    config = SandboxConfig(max_timeout_seconds=timeout)
+    sandbox = LocalAgentSandbox(config=config, sandbox_dir=dir)
+    
+    click.echo(f"⚡ Executing inside sandbox: '{command}'")
+    result = sandbox.execute(command)
+
+    if result.blocked:
+        click.secho(f"❌ BLOCKED: {result.stderr}", fg="red", bold=True)
+    else:
+        color = "green" if result.exit_code == 0 else "red"
+        click.secho(f"Exit Code: {result.exit_code} ({result.duration_ms:.1f}ms)", fg=color, bold=True)
+        if result.stdout:
+            click.echo(result.stdout)
+        if result.stderr:
+            click.secho(result.stderr, fg="yellow")
+
+    sandbox.cleanup()
+
+
+@cli.command("ai-generate")
+@click.argument("prompt_pos", required=False, default=None, metavar="PROMPT")
+@click.option("-p", "--prompt", "prompt_opt", default=None, help="Natural language prompt for pipeline generation.")
+@click.option("--provider", default="google", help="AI provider (e.g., google, openai, anthropic).")
+@click.option("--json", "output_json", is_flag=True, help="Output execution plan and architecture docs in JSON format.")
+@click.option("-o", "--output", default=None, help="File path to save the output.")
+def ai_generate(
+    prompt_pos: Optional[str],
+    prompt_opt: Optional[str],
+    provider: str,
+    output_json: bool,
+    output: Optional[str]
+):
+    """Generate an AI pipeline execution plan and architecture docs from a prompt."""
+    prompt = prompt_pos or prompt_opt
+    if not prompt:
+        sys.stderr.write("Error: A natural language prompt is required\n")
+        raise SystemExit(1)
+
+    generator = AIPipelineGenerator(provider=provider)
+    result = generator.generate_pipeline(prompt)
+
+    if output_json:
+        json_output = result.model_dump_json(indent=2)
+        if output:
+            with open(output, "w", encoding="utf-8") as f:
+                f.write(json_output)
+        click.echo(json_output)
+    else:
+        out_lines = [
+            "=== OpenHarness AI Pipeline Execution Plan ===",
+            f"Pipeline ID: {result.pipeline_id}",
+            f"Target State: {result.target_state}",
+            f"Provider: {result.provider}",
+            f"SLA Target: {result.execution_plan.sla_target}",
+            f"Cost Limit: {result.execution_plan.cost_limit}",
+            "",
+            "Execution Steps:",
+        ]
+        for step in result.execution_plan.steps:
+            out_lines.append(f"  {step.id}. {step.name}: {step.action}")
+        out_lines.extend([
+            "",
+            "=== Foundational Architecture Documentation ===",
+            f"Topology: {result.architecture_documentation.topology}",
+            f"Resilience: {result.architecture_documentation.resilience}",
+            f"Cost Optimization: {result.architecture_documentation.cost_optimization}",
+            f"Security Baseline: {result.architecture_documentation.security_baseline}",
+        ])
+        formatted_output = "\n".join(out_lines)
+        if output:
+            with open(output, "w", encoding="utf-8") as f:
+                f.write(formatted_output)
+        click.echo(formatted_output)
+
+
+def main(args: Optional[List[str]] = None) -> int:
+    """Main CLI entrypoint function that accepts list of arguments and returns status code."""
+    if args is None:
+        args = sys.argv[1:]
+    
+    try:
+        cli(args=args, standalone_mode=False)
+        return 0
+    except SystemExit as e:
+        return e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+    except click.ClickException as e:
+        sys.stderr.write(f"Error: {e}\n")
+        return 1
+    except Exception as e:
+        sys.stderr.write(f"Error: {e}\n")
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
