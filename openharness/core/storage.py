@@ -154,7 +154,13 @@ class StorageEngine:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM runs ORDER BY timestamp DESC LIMIT ?", (limit,))
             rows = cursor.fetchall()
-            return [dict(r) for r in rows]
+            runs = []
+            for r in rows:
+                r_dict = dict(r)
+                if isinstance(r_dict.get("metadata"), str):
+                    r_dict["metadata"] = json.loads(r_dict["metadata"])
+                runs.append(r_dict)
+            return runs
 
     def get_run_details(self, run_id: str) -> Optional[Dict[str, Any]]:
         with self._get_connection() as conn:
@@ -165,15 +171,27 @@ class StorageEngine:
                 return None
 
             run_dict = dict(run_row)
+            if isinstance(run_dict.get("metadata"), str):
+                run_dict["metadata"] = json.loads(run_dict["metadata"])
+
             cursor.execute("SELECT * FROM evaluation_results WHERE run_id = ?", (run_id,))
             results = []
             for res_row in cursor.fetchall():
                 res_dict = dict(res_row)
                 res_dict["passed"] = bool(res_dict["passed"])
+                if isinstance(res_dict.get("metadata"), str):
+                    res_dict["metadata"] = json.loads(res_dict["metadata"])
                 
                 # Fetch metrics
                 cursor.execute("SELECT * FROM metric_scores WHERE evaluation_result_id = ?", (res_dict["id"],))
-                res_dict["metrics"] = [dict(m) for m in cursor.fetchall()]
+                metrics = []
+                for m in cursor.fetchall():
+                    m_dict = dict(m)
+                    m_dict["passed"] = bool(m_dict["passed"])
+                    if isinstance(m_dict.get("metadata"), str):
+                        m_dict["metadata"] = json.loads(m_dict["metadata"])
+                    metrics.append(m_dict)
+                res_dict["metrics"] = metrics
                 
                 # Fetch trajectory if exists
                 if res_dict["trajectory_id"]:

@@ -53,11 +53,19 @@ def report(db):
 
 
 @cli.command()
-@click.option("--run-id", required=True, help="Run ID to render ASCII visualization for.")
+@click.option("--run-id", help="Run ID to render ASCII visualization for (defaults to latest run).")
 @click.option("--db", default=".openharness/evals.db", help="Path to SQLite evals database.")
 def viz(run_id, db):
     """Render terminal ASCII Waterfall & Scorecard visualizations."""
     storage = StorageEngine(db_path=db)
+    
+    if not run_id:
+        runs = storage.get_runs(limit=1)
+        if not runs:
+            click.echo("No evaluation runs found in " + db)
+            return
+        run_id = runs[0]["id"]
+
     details = storage.get_run_details(run_id)
     if not details:
         click.secho(f"Error: Run ID '{run_id}' not found.", fg="red")
@@ -67,6 +75,12 @@ def viz(run_id, db):
     click.echo(f"📊 VISUALIZATIONS FOR RUN: {details['name']} ({run_id})")
     click.echo("=" * 65)
 
+    # Render Scorecard
+    from openharness.core.types import EvaluationResult
+    results = [EvaluationResult(**r) for r in details.get("results", [])]
+    click.echo(render_ascii_scorecard(results))
+
+    # Render Waterfalls for trajectories
     for res in details.get("results", []):
         click.secho(f"\n▶ Test Case: {res['test_case_name']}", fg="cyan", bold=True)
         if res.get("trajectory"):
