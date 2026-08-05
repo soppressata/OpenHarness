@@ -9,6 +9,7 @@ from openharness.core.storage import StorageEngine
 from openharness.core.exporters import export_to_json, export_to_html, export_to_junit_xml
 from openharness.core.visualizations import render_ascii_waterfall, render_ascii_scorecard, render_ascii_quality_radar
 from openharness.core.synthetic import generate_synthetic_dataset
+from openharness.ci_generator import generate_github_actions_yaml
 
 
 @click.group()
@@ -156,8 +157,9 @@ def ui(port, host, db):
 
 
 @cli.command()
-def init():
-    """Initialize sample harness test file in current directory."""
+@click.option("--ci", type=click.Choice(["github"]), help="CI provider to scaffold a workflow template for.")
+def init(ci):
+    """Initialize a sample test file, or scaffold a CI workflow template."""
     sample_content = '''from openharness import eval_case, assert_tool_called, assert_exact_match, eval_goal_completion
 
 def my_simple_agent(user_query: str):
@@ -188,6 +190,15 @@ if __name__ == "__main__":
         click.echo("Launch dashboard with: harness ui")
     else:
         click.echo(f"File {target_path} already exists.")
+
+    if ci:
+        path = ".github/workflows/eval.yml"
+        written = generate_github_actions_yaml(path)
+        if written:
+            click.secho("Scaffolded github CI workflow template to .github/workflows/eval.yml", fg="green")
+            click.echo("Commit it and push to run OpenHarness evals in GitHub Actions.")
+        else:
+            click.echo(f"File {path} already exists.")
 
 
 def main():
