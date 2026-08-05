@@ -17,7 +17,7 @@
     "openharness",
     "typescript"
   ],
-  "author": "OpenHarness Team",
+  "author": "soppressata",
   "license": "MIT",
   "devDependencies": {
     "typescript": "^5.9.3"
