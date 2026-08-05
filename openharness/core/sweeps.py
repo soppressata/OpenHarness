@@ -1,3 +1,7 @@
+"""
+Sweeps module for OpenHarness.
+Provides core functionality for the sweeps subsystem.
+"""
 import time
 import math
 from typing import Any, Callable, Dict, List
