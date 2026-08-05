@@ -3,7 +3,7 @@ import sys
 import click
 from openharness.core.storage import StorageEngine
 from openharness.core.exporters import export_to_json, export_to_html, export_to_junit_xml
-from openharness.core.visualizations import render_ascii_waterfall, render_ascii_scorecard
+from openharness.core.visualizations import render_ascii_waterfall, render_ascii_scorecard, render_ascii_quality_radar
 from openharness.core.synthetic import generate_synthetic_dataset
 
 
@@ -75,10 +75,11 @@ def viz(run_id, db):
     click.echo(f"📊 VISUALIZATIONS FOR RUN: {details['name']} ({run_id})")
     click.echo("=" * 65)
 
-    # Render Scorecard
+    # Render Scorecard & Quality Matrix
     from openharness.core.types import EvaluationResult
     results = [EvaluationResult(**r) for r in details.get("results", [])]
     click.echo(render_ascii_scorecard(results))
+    click.echo("\n" + render_ascii_quality_radar(results))
 
     # Render Waterfalls for trajectories
     for res in details.get("results", []):

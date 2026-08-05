@@ -21,6 +21,7 @@ from openharness.core.exporters import export_to_json, export_to_html, export_to
 from openharness.core.visualizations import (
     render_ascii_waterfall,
     render_ascii_scorecard,
+    render_ascii_quality_radar,
     render_svg_waterfall,
     render_pairwise_diff_html
 )
@@ -52,6 +53,11 @@ from openharness.evaluators.semantic import (
     eval_safety_and_jailbreak,
     eval_cost_budget
 )
+from openharness.evaluators.quality import (
+    eval_code_quality,
+    eval_reasoning_depth,
+    eval_quality_pareto_index
+)
 from openharness.evaluators.llm_judge import llm_judge, pairwise_arena_judge
 
 from openharness.adapters.langchain import OpenHarnessLangChainCallbackHandler
@@ -74,6 +80,7 @@ __all__ = [
     "export_to_junit_xml",
     "render_ascii_waterfall",
     "render_ascii_scorecard",
+    "render_ascii_quality_radar",
     "render_svg_waterfall",
     "render_pairwise_diff_html",
     "generate_synthetic_dataset",
@@ -102,6 +109,9 @@ __all__ = [
     "eval_factuality_and_hallucination",
     "eval_safety_and_jailbreak",
     "eval_cost_budget",
+    "eval_code_quality",
+    "eval_reasoning_depth",
+    "eval_quality_pareto_index",
     "llm_judge",
     "pairwise_arena_judge",
     "OpenHarnessLangChainCallbackHandler",

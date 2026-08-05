@@ -52,6 +52,36 @@ def render_ascii_scorecard(results: List[EvaluationResult]) -> str:
     return "\n".join(lines)
 
 
+def render_ascii_quality_radar(results: List[EvaluationResult]) -> str:
+    """Render an ASCII Quality vs Latency Breakdown Table for terminal output."""
+    if not results:
+        return "No quality metrics available."
+
+    lines = ["🎯 QUALITY VS LATENCY PARETO MATRIX"]
+    lines.append("=" * 70)
+    lines.append(f"{'TEST CASE':<28} | {'QUALITY':<8} | {'LATENCY':<9} | {'PARETO EFFICIENCY'}")
+    lines.append("-" * 70)
+
+    for res in results:
+        quality_metrics = [m for m in res.metrics if m.category in ["quality", "assertion", "llm_judge"]]
+        avg_quality = (sum(m.score for m in quality_metrics) / len(quality_metrics)) if quality_metrics else res.total_score
+        
+        latency_str = f"{res.duration_ms:.1f}ms"
+        
+        # Pareto efficiency: High Quality (>0.8) regardless of latency is EXCELLENT
+        if avg_quality >= 0.9:
+            pareto_str = "OPTIMAL (High Quality)"
+        elif avg_quality >= 0.7:
+            pareto_str = "BALANCED"
+        else:
+            pareto_str = "SUBOPTIMAL (Low Quality)"
+
+        lines.append(f"{res.test_case_name[:28]:<28} | {avg_quality:8.2f} | {latency_str:<9} | {pareto_str}")
+
+    lines.append("=" * 70)
+    return "\n".join(lines)
+
+
 def render_svg_waterfall(trajectory: Trajectory) -> str:
     """Generate a self-contained SVG Waterfall Gantt chart."""
     steps = trajectory.steps
