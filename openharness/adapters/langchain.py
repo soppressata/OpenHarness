@@ -1,3 +1,7 @@
+"""
+Langchain module for OpenHarness.
+Provides core functionality for the langchain subsystem.
+"""
 from typing import Any, Dict, List, Optional
 from openharness.core.types import Trajectory, Step, ToolCall
 
