@@ -1,3 +1,7 @@
+"""
+Visualizations module for OpenHarness.
+Provides core functionality for the visualizations subsystem.
+"""
 import html
 from typing import Dict, Any, List, Optional
 from openharness.core.types import Trajectory, EvaluationResult
