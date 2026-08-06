@@ -1,3 +1,4 @@
+- **Feature**: Harness Grid: Distributed Multi-Node Test Orchestration Fabric with Self-Healing Topology (Issue #41)
 - **Feature**: Cross-Boundary Test Mesh: Federated, Self-Healing Execution + Global Intelligence Fabric for OpenHarness (Issue #40)
 - **Feature**: Cross-Boundary Test Mesh — federated execution grid, self-healing Cortex, Black Box replay, and Commons intelligence fabric (`openharness.mesh`, `harness mesh demo`)
 - **Feature**: Add GitHub Actions CI template generator (Issue #32)
