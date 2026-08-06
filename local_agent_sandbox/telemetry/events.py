@@ -36,6 +36,3 @@ def record_event(
     return ledger.record_event(
         category=cat_str, persona=persona, repo=repo, detail=detail, state=state
     )
-
-
-from telemetry.events import *

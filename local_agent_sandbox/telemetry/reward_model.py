@@ -136,6 +136,3 @@ def get_persona_prompt_suffix(
     """Retrieve prompt suffix for a persona from overrides file."""
     override = get_persona_override(persona, overrides_path=overrides_path)
     return override.get("prompt_suffix", "")
-
-
-from telemetry.reward_model import *

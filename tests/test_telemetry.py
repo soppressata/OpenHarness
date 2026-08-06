@@ -102,7 +102,7 @@ def test_harvest_parsing(tmp_path, monkeypatch):
             {
                 "number": 42,
                 "title": "Add feature",
-                "comments": [{"body": "HARVEST: {\"fix\": \"add_type_annotations\"}"}],
+                "comments": [{"body": 'HARVEST: {"fix": "add_type_annotations"}'}],
             }
         ]
     )
