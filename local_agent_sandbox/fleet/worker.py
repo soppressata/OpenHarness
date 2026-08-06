@@ -88,14 +88,27 @@ class FleetWorker:
             active_tasks=active_tasks,
         )
 
-    def execute_test(self, test_spec_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def execute_test(
+        self, test_spec_dict: Dict[str, Any], timeout_seconds: int = 60
+    ) -> Dict[str, Any]:
         """
         Executes a test spec locally via an isolated pytest subprocess.
 
         Returns a dict with status ``PASSED``, ``FAILED``, or ``INFRA_ERROR``,
         captured output, and a duration. Missing files or subprocess errors are
         reported as infrastructure errors so the fleet can retry them elsewhere.
+
+        Args:
+            test_spec_dict: Test metadata including ``file_path`` and optional
+                ``trace_id``.
+            timeout_seconds: Maximum execution time for the pytest subprocess.
+
+        Raises:
+            ValueError: If ``timeout_seconds`` is not positive.
         """
+        if timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be positive")
+
         test_id = test_spec_dict.get("test_id", "unknown-test")
         file_path = test_spec_dict.get("file_path", "test.py")
         trace_id = test_spec_dict.get("trace_id", "")
@@ -120,7 +133,7 @@ class FleetWorker:
                 [sys.executable, "-m", "pytest", file_path, "-v", "--tb=short"],
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=timeout_seconds,
             )
             duration = time.time() - start
             output = f"{proc.stdout}\n{proc.stderr}".strip()
@@ -135,7 +148,7 @@ class FleetWorker:
         except subprocess.TimeoutExpired:
             duration = time.time() - start
             status = "INFRA_ERROR"
-            error_message = f"Test timed out after 60s: {file_path}"
+            error_message = f"Test timed out after {timeout_seconds}s: {file_path}"
             stack_trace = ""
         except Exception as exc:  # pragma: no cover - defensive fallback
             duration = time.time() - start

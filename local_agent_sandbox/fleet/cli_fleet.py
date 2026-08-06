@@ -158,7 +158,8 @@ def handle_fleet_run(
                     "test_id": spec.test_id,
                     "file_path": spec.file_path,
                     "trace_id": trace_id,
-                }
+                },
+                timeout_seconds=timeout,
             )
             res = TestExecutionResult(
                 test_id=raw_res["test_id"],
@@ -193,13 +194,15 @@ def handle_fleet_run(
                                 hostname=retry_node.hostname,
                                 node_id=retry_node.node_id,
                             )
-                            retry_trace = generate_trace_id()
                             raw_res = retry_worker.execute_test(
                                 {
                                     "test_id": spec.test_id,
                                     "file_path": spec.file_path,
-                                    "trace_id": retry_trace,
-                                }
+                                    # Keep one trace across infrastructure
+                                    # retries so logs and artifacts reconcile.
+                                    "trace_id": trace_id,
+                                },
+                                timeout_seconds=timeout,
                             )
                             res = TestExecutionResult(
                                 test_id=raw_res["test_id"],
@@ -208,7 +211,7 @@ def handle_fleet_run(
                                 error_message=raw_res.get("error_message", ""),
                                 stack_trace=raw_res.get("stack_trace", ""),
                                 duration_seconds=raw_res.get("duration_seconds", 0.0),
-                                trace_id=raw_res.get("trace_id", retry_trace),
+                                trace_id=raw_res.get("trace_id", trace_id),
                             )
                             if res.status == "PASSED":
                                 self_healing.reconcile_result(res)
@@ -242,7 +245,11 @@ def handle_fleet_run(
         f"[HarnessFleet] Run complete: {summary['passed']} passed, {summary['failed']} failed, "
         f"{summary['infra_errors']} infra errors, {summary['total_retries_attempted']} retries."
     )
-    print(f"[HarnessFleet] Fleet run completed successfully! Total reconciled tests: {len(completed_tests)}")
+    result_label = "successfully" if failures == 0 else "with failures"
+    print(
+        f"[HarnessFleet] Fleet run completed {result_label}! "
+        f"Total reconciled tests: {len(completed_tests)}"
+    )
     return 0 if failures == 0 else 1
 
 

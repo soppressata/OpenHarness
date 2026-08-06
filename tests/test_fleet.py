@@ -254,6 +254,33 @@ def test_worker_execution_and_heartbeats(tmp_path):
     assert cond.nodes[worker.node_id].status == NodeStatus.HEALTHY
 
 
+def test_worker_passes_fleet_timeout_to_pytest(monkeypatch, tmp_path):
+    """The fleet run timeout must constrain the worker subprocess."""
+    cond = FleetConductor()
+    worker = FleetWorker(conductor=cond)
+    test_file = tmp_path / "test_timeout.py"
+    test_file.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    observed = {}
+
+    class Completed:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(*args, **kwargs):
+        observed["timeout"] = kwargs["timeout"]
+        return Completed()
+
+    monkeypatch.setattr("local_agent_sandbox.fleet.worker.subprocess.run", fake_run)
+    result = worker.execute_test(
+        {"test_id": "timeout-test", "file_path": str(test_file)},
+        timeout_seconds=17,
+    )
+
+    assert result["status"] == "PASSED"
+    assert observed["timeout"] == 17
+
+
 def test_fleet_run_real_tests_and_failures(tmp_path):
     """End-to-end: a real pytest suite runs through the fleet, with assertion failures non-retried."""
     passing = tmp_path / "test_pass.py"
