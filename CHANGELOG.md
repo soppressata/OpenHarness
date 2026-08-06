@@ -1,3 +1,4 @@
+- **Feature**: `harness prune`: local eval-database retention & cleanup command (Issue #46)
 - **Feature**: Configurable Retry Backoff Strategy for Flaky Tasks (Issue #44)
 - **Feature**: Harness Grid: Distributed Multi-Node Test Orchestration Fabric with Self-Healing Topology (Issue #41)
 - **Feature**: Cross-Boundary Test Mesh: Federated, Self-Healing Execution + Global Intelligence Fabric for OpenHarness (Issue #40)
