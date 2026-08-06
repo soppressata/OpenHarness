@@ -106,7 +106,9 @@ class FleetSelfHealingEngine:
         cutoff = ts - self.quarantine_window_seconds
         node.infra_error_timestamps = [t for t in node.infra_error_timestamps if t >= cutoff]
 
-        if len(node.infra_error_timestamps) >= self.quarantine_threshold:
+        # The policy is "more than five" errors, so the threshold is crossed
+        # by the first error strictly above the configured value.
+        if len(node.infra_error_timestamps) > self.quarantine_threshold:
             self.conductor.quarantine_node(
                 node_id,
                 reason=f"Exceeded {self.quarantine_threshold} infrastructure errors in {self.quarantine_window_seconds}s window"

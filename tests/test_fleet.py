@@ -138,7 +138,7 @@ def test_self_healing_and_quarantine():
 
     node.infra_error_timestamps.clear()
     now = time.time()
-    for _ in range(4):
+    for _ in range(5):
         quarantined = engine.record_node_infra_error(node.node_id, timestamp=now)
         assert quarantined is False
 

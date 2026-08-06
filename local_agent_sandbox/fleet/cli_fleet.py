@@ -106,7 +106,12 @@ def handle_fleet_run(
     checkpoint_path = _checkpoint_path(config_path)
     conductor = FleetConductor(config=config)
     scheduler = FleetScheduler()
-    self_healing = FleetSelfHealingEngine(conductor=conductor)
+    self_healing = FleetSelfHealingEngine(
+        conductor=conductor,
+        max_infra_retries=config.max_infra_retries,
+        quarantine_threshold=config.quarantine_threshold,
+        quarantine_window_seconds=config.quarantine_window_seconds,
+    )
     dashboard = FleetObservabilityDashboard(conductor=conductor)
 
     workers: Dict[str, FleetWorker] = {}
@@ -186,55 +191,46 @@ def handle_fleet_run(
                     stack_trace=res.stack_trace,
                     trace_id=res.trace_id,
                 )
-                err_type = self_healing.classify_error(res.error_message, res.stack_trace)
-                if err_type == ErrorType.INFRASTRUCTURE:
-                    retried_tests[res.test_id] = retried_tests.get(res.test_id, 0) + 1
-                    if retried_tests[res.test_id] <= self_healing.max_infra_retries:
-                        healthy_pool = [
-                            n for n in conductor.get_healthy_nodes() if n.node_id != node_id
-                        ]
-                        if healthy_pool:
-                            retry_node = healthy_pool[0]
-                            retry_worker = workers.get(retry_node.node_id) or FleetWorker(
-                                conductor=conductor,
-                                address=retry_node.address,
-                                hostname=retry_node.hostname,
-                                node_id=retry_node.node_id,
-                            )
-                            raw_res = retry_worker.execute_test(
-                                {
-                                    "test_id": spec.test_id,
-                                    "file_path": spec.file_path,
-                                    # Keep one trace across infrastructure
-                                    # retries so logs and artifacts reconcile.
-                                    "trace_id": trace_id,
-                                },
-                                timeout_seconds=timeout,
-                            )
-                            res = TestExecutionResult(
-                                test_id=raw_res["test_id"],
-                                node_id=raw_res["node_id"],
-                                status=raw_res["status"],
-                                error_message=raw_res.get("error_message", ""),
-                                stack_trace=raw_res.get("stack_trace", ""),
-                                duration_seconds=raw_res.get("duration_seconds", 0.0),
-                                trace_id=raw_res.get("trace_id", trace_id),
-                            )
-                            if res.status == "PASSED":
-                                self_healing.reconcile_result(res)
-                                completed_tests[spec.test_id] = res.to_dict()
-                                continue
-                            dashboard.record_failure(
-                                test_id=res.test_id,
-                                node_id=res.node_id,
-                                error_message=res.error_message,
-                                stack_trace=res.stack_trace,
-                                trace_id=res.trace_id,
-                            )
+                should_retry, retry_node_id = self_healing.handle_test_failure(
+                    test_id=res.test_id,
+                    node_id=res.node_id,
+                    error_message=res.error_message,
+                    stack_trace=res.stack_trace,
+                    duration=res.duration_seconds,
+                    trace_id=res.trace_id,
+                )
+                if should_retry and retry_node_id and retry_node_id != node_id:
+                    retry_worker = workers.get(retry_node_id)
+                    if retry_worker is not None:
+                        raw_res = retry_worker.execute_test(
+                            {
+                                "test_id": spec.test_id,
+                                "file_path": spec.file_path,
+                                # Keep one trace across infrastructure retries.
+                                "trace_id": trace_id,
+                            },
+                            timeout_seconds=timeout,
+                        )
+                        res = TestExecutionResult(
+                            test_id=raw_res["test_id"],
+                            node_id=raw_res["node_id"],
+                            status=raw_res["status"],
+                            error_message=raw_res.get("error_message", ""),
+                            stack_trace=raw_res.get("stack_trace", ""),
+                            duration_seconds=raw_res.get("duration_seconds", 0.0),
+                            trace_id=raw_res.get("trace_id", trace_id),
+                        )
+                        if res.status == "PASSED":
                             self_healing.reconcile_result(res)
                             completed_tests[spec.test_id] = res.to_dict()
-                            failures += 1
                             continue
+                        dashboard.record_failure(
+                            test_id=res.test_id,
+                            node_id=res.node_id,
+                            error_message=res.error_message,
+                            stack_trace=res.stack_trace,
+                            trace_id=res.trace_id,
+                        )
 
                 self_healing.reconcile_result(res)
                 completed_tests[spec.test_id] = res.to_dict()
