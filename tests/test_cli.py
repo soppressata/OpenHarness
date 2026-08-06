@@ -84,3 +84,50 @@ def test_cli_fleet_init_and_run(tmp_path, monkeypatch):
     )
     assert run_result.exit_code == 0
     assert "Fleet run completed successfully" in run_result.output
+
+
+from click.testing import CliRunner
+from local_agent_sandbox.cli import cli
+
+
+def test_cli_run_command():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["run", "echo 'CLI test'"])
+    assert result.exit_code == 0
+    assert "CLI test" in result.output
+
+
+def test_cli_blocked_command():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["run", "rm -rf /"])
+    assert "BLOCKED" in result.output
+
+
+def test_cli_validate_command_valid(tmp_path):
+    config_file = tmp_path / "task.yaml"
+    config_file.write_text("""
+version: "1.0"
+name: "test-task-suite"
+tasks:
+  - name: "lint"
+    command: "flake8"
+    timeout_seconds: 120
+""")
+    runner = CliRunner()
+    result = runner.invoke(cli, ["validate", str(config_file)])
+    assert result.exit_code == 0
+    assert "is valid" in result.output
+
+
+def test_cli_validate_command_invalid(tmp_path):
+    config_file = tmp_path / "invalid_task.yaml"
+    config_file.write_text("""
+version: "1.0"
+tasks:
+  - name: "bad-task"
+    timeout_seconds: -10
+""")
+    runner = CliRunner()
+    result = runner.invoke(cli, ["validate", str(config_file)])
+    assert result.exit_code != 0
+    assert "Validation error" in result.output
