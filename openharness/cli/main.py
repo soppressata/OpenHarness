@@ -191,6 +191,27 @@ if __name__ == "__main__":
     else:
         click.echo(f"File {target_path} already exists.")
 
+    env_path = ".env.example"
+    env_content = """# OpenHarness Configuration Environment Variables
+
+# 1. LLM API Keys and Endpoints (for LLM-as-a-Judge and Synthetic Dataset Generation)
+# If using OpenAI:
+# OPENAI_API_KEY=your-openai-api-key-here
+# If using an OpenAI-compatible provider (e.g. OpenRouter, DeepSeek, Local vLLM):
+# OPENAI_BASE_URL=https://api.openai.com/v1
+
+# 2. Database Configuration
+# Defaults to local SQLite at `.openharness/evals.db`.
+# To use a shared PostgreSQL instance, uncomment and set the connection string:
+# OPENHARNESS_DB_URL=postgresql://username:password@localhost:5432/openharness_db
+"""
+    if not os.path.exists(env_path):
+        with open(env_path, "w") as f:
+            f.write(env_content)
+        click.secho(f"Created configuration template: {env_path}", fg="green")
+    else:
+        click.echo(f"File {env_path} already exists.")
+
     if ci:
         path = ".github/workflows/eval.yml"
         written = generate_github_actions_yaml(path)
