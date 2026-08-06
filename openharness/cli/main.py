@@ -11,7 +11,7 @@ from openharness.core.exporters import export_to_json, export_to_html, export_to
 from openharness.core.visualizations import render_ascii_waterfall, render_ascii_scorecard, render_ascii_quality_radar
 from openharness.core.synthetic import generate_synthetic_dataset
 from openharness.ci_generator import generate_github_actions_yaml
-from local_agent_sandbox.fleet import (
+from openharness.fleet import (
     handle_fleet_dashboard,
     handle_fleet_init,
     handle_fleet_join,

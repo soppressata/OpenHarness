@@ -6,7 +6,7 @@ import json
 import pytest
 from unittest.mock import patch, MagicMock
 
-from local_agent_sandbox.diagnostics import (
+from openharness.diagnostics import (
     AIDiagnosticsEngine,
     FailedStepContext,
     DiagnosisReport,

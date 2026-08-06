@@ -1,5 +1,5 @@
 """
-End-to-End Test Suite for HarnessFleet (local_agent_sandbox.fleet).
+End-to-End Test Suite for HarnessFleet (openharness.fleet).
 Covers Conductor discovery, health heartbeats, affinity/DAG scheduling,
 self-healing retries, node quarantine, result reconciliation, observability fingerprinting,
 and CLI handlers.
@@ -9,7 +9,7 @@ import os
 import json
 import time
 import pytest
-from local_agent_sandbox.fleet import (
+from openharness.fleet import (
     NodeCapability,
     generate_default_config,
     save_config,
@@ -273,7 +273,7 @@ def test_worker_passes_fleet_timeout_to_pytest(monkeypatch, tmp_path):
         observed["timeout"] = kwargs["timeout"]
         return Completed()
 
-    monkeypatch.setattr("local_agent_sandbox.fleet.worker.subprocess.run", fake_run)
+    monkeypatch.setattr("openharness.fleet.worker.subprocess.run", fake_run)
     result = worker.execute_test(
         {"test_id": "timeout-test", "file_path": str(test_file)},
         timeout_seconds=17,

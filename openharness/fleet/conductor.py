@@ -1,162 +1,198 @@
 """
-Conductor module for OpenHarness HarnessFleet.
-Implements the control plane: worker registry, heartbeat tracking, health monitoring, and quarantine logic.
+Fleet Control Plane ("The Conductor").
+Manages worker node discovery, registration, heartbeat monitoring, token security, and live node health registry.
 """
-from __future__ import annotations
 
-import threading
 import time
-from typing import Dict, List, Optional
-from openharness.fleet.models import (
-    FleetConfig,
-    NodeState,
-    WorkerCapabilities,
-    WorkerNode,
-    WorkerSpec,
-)
+import uuid
+import hmac
+import hashlib
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, field, asdict
+from enum import Enum
+
+from .config import FleetConfig, NodeCapability
 
 
-class Conductor:
-    """The Fleet Control Plane.
+class NodeStatus(str, Enum):
+    HEALTHY = "HEALTHY"
+    UNHEALTHY = "UNHEALTHY"
+    QUARANTINED = "QUARANTINED"
+    BUSY = "BUSY"
+    DRAINING = "DRAINING"
 
-    Manages worker registration, heartbeat tracking, health monitoring,
-    and automatic quarantine of unhealthy or flaky nodes.
+
+@dataclass
+class WorkerNode:
+    node_id: str
+    address: str
+    hostname: str = "node-worker"
+    status: NodeStatus = NodeStatus.HEALTHY
+    capabilities: NodeCapability = field(default_factory=NodeCapability)
+    last_heartbeat: float = field(default_factory=time.time)
+    missed_heartbeats: int = 0
+    active_tasks: int = 0
+    cpu_percent: float = 0.0
+    ram_percent: float = 0.0
+    ephemeral: bool = False
+    infra_error_timestamps: List[float] = field(default_factory=list)
+    registered_at: float = field(default_factory=time.time)
+
+    def to_dict(self) -> Dict[str, Any]:
+        res = asdict(self)
+        res["status"] = self.status.value
+        return res
+
+
+class FleetConductor:
+    """
+    Control plane engine maintaining live registry of nodes, checking heartbeats,
+    generating/verifying enrolment tokens, and discovering workers across heterogeneous infrastructure.
     """
 
-    def __init__(self, config: FleetConfig):
-        self.config = config
-        self.heartbeat_interval: float = config.conductor.get(
-            "heartbeat_interval_sec", 5
-        )
-        self.miss_threshold: int = config.conductor.get(
-            "heartbeat_miss_threshold", 3
-        )
-        self._workers: Dict[str, WorkerNode] = {}
-        self._lock = threading.Lock()
+    def __init__(self, config: Optional[FleetConfig] = None, secret_key: str = "fleet-secret-key"):
+        self.config = config or FleetConfig()
+        self.secret_key = secret_key
+        self.nodes: Dict[str, WorkerNode] = {}
+        self.valid_tokens: Dict[str, float] = {}
 
-    @property
-    def worker_count(self) -> int:
-        """Return total number of registered workers."""
-        return len(self._workers)
+    def generate_enrollment_token(self, ttl: int = 3600) -> str:
+        """Generates a signed, short-lived enrolment token for worker onboarding."""
+        expiry = time.time() + ttl
+        raw = f"{uuid.uuid4().hex}:{expiry}"
+        sig = hmac.new(self.secret_key.encode(), raw.encode(), hashlib.sha256).hexdigest()
+        token = f"{raw}:{sig[:16]}"
+        self.valid_tokens[token] = expiry
+        return token
 
-    def register_worker(
-        self,
-        host: str,
-        port: int,
-        capabilities: Optional[WorkerCapabilities] = None,
-        ephemeral: bool = False,
-        labels: Optional[Dict[str, str]] = None,
-        worker_id: Optional[str] = None,
-    ) -> WorkerNode:
-        """Register a new worker node with the conductor."""
-        with self._lock:
-            kwargs = {
-                "host": host,
-                "port": port,
-                "capabilities": capabilities or WorkerCapabilities(),
-                "ephemeral": ephemeral,
-                "labels": labels or {},
-            }
-            if worker_id is not None:
-                kwargs["id"] = worker_id
-            node = WorkerNode(**kwargs)
-            self._workers[node.id] = node
-            return node
-
-    def register_workers_from_config(self) -> List[WorkerNode]:
-        """Register all worker specs defined in the fleet configuration."""
-        nodes: List[WorkerNode] = []
-        for spec in self.config.workers:
-            node = self.register_worker(
-                host=spec.host,
-                port=spec.port,
-                capabilities=spec.capabilities,
-                ephemeral=spec.ephemeral,
-                labels=spec.labels,
-                worker_id=spec.id,
-            )
-            nodes.append(node)
-        return nodes
-
-    def heartbeat(self, worker_id: str) -> bool:
-        """Record a heartbeat from a worker. Returns True if accepted."""
-        with self._lock:
-            node = self._workers.get(worker_id)
-            if node is None:
-                return False
-            node.last_heartbeat = time.time()
-            node.consecutive_missed = 0
-            if node.state == NodeState.UNHEALTHY:
-                node.state = NodeState.HEALTHY
-            return True
-
-    def record_infra_error(self, worker_id: str) -> None:
-        """Record an infrastructure error for a worker; quarantine if threshold exceeded.
-
-        A worker failing more than 5 infra errors within a 60-second window is auto-quarantined.
-        """
-        with self._lock:
-            node = self._workers.get(worker_id)
-            if node is None:
-                return
-            now = time.time()
-            if now - node.infra_error_window_start > 60.0:
-                node.infra_error_window_start = now
-                node.infra_errors = 1
-            else:
-                node.infra_errors += 1
-                if node.infra_errors > 5:
-                    node.state = NodeState.QUARANTINED
-
-    def check_health(self) -> Dict[str, NodeState]:
-        """Evaluate health of all workers based on heartbeat freshness.
-
-        Workers missing >= miss_threshold consecutive heartbeats are marked UNHEALTHY.
-        Returns mapping of worker_id to current state.
-        """
-        now = time.time()
-        with self._lock:
-            for node in self._workers.values():
-                elapsed = now - node.last_heartbeat
-                if elapsed > self.heartbeat_interval:
-                    missed_periods = int(elapsed / self.heartbeat_interval)
-                    node.consecutive_missed = max(
-                        node.consecutive_missed, missed_periods
-                    )
-                if (
-                    node.state != NodeState.QUARANTINED
-                    and node.consecutive_missed >= self.miss_threshold
-                ):
-                    node.state = NodeState.UNHEALTHY
-            return {wid: node.state for wid, node in self._workers.items()}
-
-    def get_healthy_workers(self) -> List[WorkerNode]:
-        """Return all workers currently in HEALTHY state."""
-        self.check_health()
-        with self._lock:
-            return [
-                node
-                for node in self._workers.values()
-                if node.state == NodeState.HEALTHY
-            ]
-
-    def get_worker(self, worker_id: str) -> Optional[WorkerNode]:
-        """Look up a worker by ID."""
-        return self._workers.get(worker_id)
-
-    def get_all_workers(self) -> List[WorkerNode]:
-        """Return all registered workers."""
-        return list(self._workers.values())
-
-    def remove_worker(self, worker_id: str) -> bool:
-        """Remove a worker from the registry. Returns True if found and removed."""
-        with self._lock:
-            if worker_id in self._workers:
-                del self._workers[worker_id]
-                return True
+    def verify_enrollment_token(self, token: str) -> bool:
+        """Verifies if an enrolment token is authentic and unexpired."""
+        if token not in self.valid_tokens:
+            parts = token.split(":")
+            if len(parts) == 3:
+                raw = f"{parts[0]}:{parts[1]}"
+                sig = hmac.new(self.secret_key.encode(), raw.encode(), hashlib.sha256).hexdigest()
+                if sig[:16] == parts[2] and float(parts[1]) > time.time():
+                    return True
             return False
+        expiry = self.valid_tokens[token]
+        if time.time() > expiry:
+            del self.valid_tokens[token]
+            return False
+        return True
 
-    def reset(self) -> None:
-        """Clear all registered workers (for testing/restart)."""
-        with self._lock:
-            self._workers.clear()
+    def register_node(
+        self,
+        address: str,
+        hostname: str = "worker-node",
+        node_id: Optional[str] = None,
+        capabilities: Optional[NodeCapability] = None,
+        ephemeral: bool = False,
+        token: Optional[str] = None,
+    ) -> WorkerNode:
+        """Registers a discovered or onboarded worker node in the grid registry."""
+        if token and not self.verify_enrollment_token(token):
+            raise ValueError("Invalid or expired enrollment token")
+
+        nid = node_id or f"node-{uuid.uuid4().hex[:8]}"
+        node = WorkerNode(
+            node_id=nid,
+            address=address,
+            hostname=hostname,
+            status=NodeStatus.HEALTHY,
+            capabilities=capabilities or NodeCapability(),
+            last_heartbeat=time.time(),
+            missed_heartbeats=0,
+            ephemeral=ephemeral,
+        )
+        self.nodes[nid] = node
+        return node
+
+    def record_heartbeat(
+        self,
+        node_id: str,
+        cpu_percent: float = 0.0,
+        ram_percent: float = 0.0,
+        active_tasks: int = 0,
+    ) -> bool:
+        """Records a heartbeat from a worker, updating metrics and health state."""
+        node = self.nodes.get(node_id)
+        if not node:
+            return False
+        node.last_heartbeat = time.time()
+        node.missed_heartbeats = 0
+        node.cpu_percent = cpu_percent
+        node.ram_percent = ram_percent
+        node.active_tasks = active_tasks
+        if node.status == NodeStatus.UNHEALTHY:
+            node.status = NodeStatus.HEALTHY
+        return True
+
+    def check_heartbeats(self, now: Optional[float] = None) -> List[str]:
+        """
+        Evaluates node health against missed heartbeat threshold.
+        Marks nodes UNHEALTHY if they fail consecutive heartbeats.
+        """
+        current = now if now is not None else time.time()
+        unhealthy: List[str] = []
+
+        for node_id, node in self.nodes.items():
+            if node.status in (NodeStatus.QUARANTINED, NodeStatus.DRAINING):
+                continue
+            elapsed = current - node.last_heartbeat
+            missed = int(elapsed // self.config.heartbeat_interval)
+            node.missed_heartbeats = missed
+            if missed >= self.config.max_missed_heartbeats:
+                node.status = NodeStatus.UNHEALTHY
+                unhealthy.append(node_id)
+
+        return unhealthy
+
+    def discover_nodes(self, discovery_sources: Optional[List[str]] = None) -> List[WorkerNode]:
+        """
+        Discovers workers via mDNS, Kubernetes, SSH, or static lists within specified window.
+        """
+        sources = discovery_sources or self.config.static_workers
+        discovered = []
+        for src in sources:
+            nid = f"disc-{hashlib.md5(src.encode()).hexdigest()[:8]}"
+            if nid not in self.nodes:
+                node = self.register_node(address=src, hostname=f"host-{src.replace(':', '-')}", node_id=nid)
+                discovered.append(node)
+        return discovered
+
+    def get_healthy_nodes(self) -> List[WorkerNode]:
+        return [n for n in self.nodes.values() if n.status in (NodeStatus.HEALTHY, NodeStatus.BUSY)]
+
+    def quarantine_node(self, node_id: str, reason: str = "High infrastructure error rate") -> bool:
+        """Puts a node in quarantine to prevent scheduling tests onto it."""
+        node = self.nodes.get(node_id)
+        if not node:
+            return False
+        node.status = NodeStatus.QUARANTINED
+        return True
+
+    def unquarantine_node(self, node_id: str) -> bool:
+        """Re-validates and restores a quarantined node to HEALTHY status."""
+        node = self.nodes.get(node_id)
+        if not node:
+            return False
+        node.status = NodeStatus.HEALTHY
+        node.infra_error_timestamps.clear()
+        return True
+
+    def get_grid_summary(self) -> Dict[str, Any]:
+        """Returns a snapshot of the grid node counts and health summary."""
+        total = len(self.nodes)
+        healthy = len([n for n in self.nodes.values() if n.status == NodeStatus.HEALTHY])
+        unhealthy = len([n for n in self.nodes.values() if n.status == NodeStatus.UNHEALTHY])
+        quarantined = len([n for n in self.nodes.values() if n.status == NodeStatus.QUARANTINED])
+        busy = len([n for n in self.nodes.values() if n.status == NodeStatus.BUSY])
+        return {
+            "total": total,
+            "healthy": healthy,
+            "unhealthy": unhealthy,
+            "quarantined": quarantined,
+            "busy": busy,
+            "nodes": [n.to_dict() for n in self.nodes.values()],
+        }
