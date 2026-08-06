@@ -136,3 +136,6 @@ class MeritLedger:
             cursor.execute(query, params)
             rows = cursor.fetchall()
             return [dict(r) for r in rows]
+
+
+from telemetry.merit_ledger import *

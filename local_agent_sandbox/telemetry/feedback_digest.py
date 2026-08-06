@@ -59,3 +59,6 @@ def push_feedback_digest(
         return True
     except Exception:
         return False
+
+
+from telemetry.feedback_digest import *

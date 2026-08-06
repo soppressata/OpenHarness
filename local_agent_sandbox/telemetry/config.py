@@ -40,3 +40,6 @@ def set_telemetry_enabled(enabled: Optional[bool]) -> None:
     """Set explicit override for telemetry enabled state (useful for testing)."""
     global _OVERRIDE_ENABLED
     _OVERRIDE_ENABLED = enabled
+
+
+from telemetry.config import *
