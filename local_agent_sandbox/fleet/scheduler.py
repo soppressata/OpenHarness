@@ -3,8 +3,7 @@ Intelligent Scheduler ("The Conductor's Brain").
 Handles affinity-aware scheduling, dependency DAG topological execution, adaptive sharding, and spot worker management.
 """
 
-import math
-from typing import Dict, List, Set, Optional, Any
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from .conductor import WorkerNode, NodeStatus
 
@@ -20,8 +19,12 @@ class TestSpec:
     estimated_duration: float = 1.0
 
 
+TestCase = TestSpec
+
+
 @dataclass
 class TestShard:
+    __test__ = False
     shard_id: int
     test_specs: List[TestSpec] = field(default_factory=list)
 
@@ -35,9 +38,6 @@ class FleetScheduler:
     Schedules test execution across available fleet workers with capability affinity,
     DAG topological sorting, and balanced sharding.
     """
-
-    def __init__(self):
-        pass
 
     def filter_nodes_by_affinity(self, test: TestSpec, nodes: List[WorkerNode]) -> List[WorkerNode]:
         """
@@ -170,7 +170,6 @@ class FleetScheduler:
                 num_shards = num_nodes
 
         assignments: Dict[str, List[TestSpec]] = {n.node_id: [] for n in healthy_nodes}
-
         dag_levels = self.build_dag_execution_order(tests)
 
         for level in dag_levels:

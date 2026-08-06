@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 
-from .conductor import FleetConductor, WorkerNode, NodeStatus
+from .conductor import FleetConductor
 
 
 class ErrorType(str, Enum):
@@ -24,7 +24,7 @@ class TestExecutionResult:
     __test__ = False
     test_id: str
     node_id: str
-    status: str  # PASSED, FAILED, INFRA_ERROR
+    status: str
     error_message: str = ""
     stack_trace: str = ""
     duration_seconds: float = 0.0

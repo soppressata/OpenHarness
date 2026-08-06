@@ -3,16 +3,14 @@ Fleet Worker Node Engine ("The Immune System Worker").
 Handles node onboarding, local capability detection, heartbeat emission, and test execution.
 """
 
-import sys
 import platform
-import os
 import time
 import uuid
 import shutil
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 
 from .config import NodeCapability
-from .conductor import FleetConductor, WorkerNode, NodeStatus
+from .conductor import FleetConductor, WorkerNode
 
 
 def detect_node_capabilities() -> NodeCapability:

@@ -10,7 +10,6 @@ import json
 import time
 import pytest
 from local_agent_sandbox.fleet import (
-    FleetConfig,
     NodeCapability,
     generate_default_config,
     save_config,
