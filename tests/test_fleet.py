@@ -210,27 +210,68 @@ def test_cli_fleet_handlers(tmp_path):
     status_str = handle_fleet_status()
     assert "HarnessFleet Grid Status" in status_str
 
-    exit_code = handle_fleet_run(nodes_count=2, shards="auto", config_path=saved_path)
+    test_file = str(tmp_path / "test_example.py")
+    with open(test_file, "w", encoding="utf-8") as f:
+        f.write("def test_example():\n    assert True\n")
+
+    exit_code = handle_fleet_run(
+        test_files=[test_file],
+        nodes_count=2,
+        shards="auto",
+        config_path=saved_path,
+    )
     assert exit_code == 0
 
     dash_state = handle_fleet_dashboard()
     assert "grid" in dash_state
 
 
-def test_worker_execution_and_heartbeats():
+def test_worker_execution_and_heartbeats(tmp_path):
     cond = FleetConductor()
     worker = FleetWorker(conductor=cond)
     assert worker.send_heartbeat() is True
     assert worker.registered is True
 
-    res = worker.execute_test({"test_id": "test_exec_1", "file_path": "t.py"})
+    passing_test = tmp_path / "test_passing.py"
+    passing_test.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    res = worker.execute_test({"test_id": "test_exec_1", "file_path": str(passing_test)})
     assert res["status"] == "PASSED"
     assert res["test_id"] == "test_exec_1"
+    assert res["node_id"] == worker.node_id
+
+    failing_test = tmp_path / "test_failing.py"
+    failing_test.write_text("def test_bad():\n    assert False\n", encoding="utf-8")
+    res = worker.execute_test({"test_id": "test_exec_2", "file_path": str(failing_test)})
+    assert res["status"] == "FAILED"
+    assert "AssertionError" in res["error_message"] or "assert" in res["stack_trace"].lower()
+
+    missing_res = worker.execute_test({"test_id": "test_exec_3", "file_path": str(tmp_path / "missing.py")})
+    assert missing_res["status"] == "INFRA_ERROR"
 
     cond.quarantine_node(worker.node_id)
     assert cond.nodes[worker.node_id].status == NodeStatus.QUARANTINED
     cond.unquarantine_node(worker.node_id)
     assert cond.nodes[worker.node_id].status == NodeStatus.HEALTHY
+
+
+def test_fleet_run_real_tests_and_failures(tmp_path):
+    """End-to-end: a real pytest suite runs through the fleet, with assertion failures non-retried."""
+    passing = tmp_path / "test_pass.py"
+    passing.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+
+    failing = tmp_path / "test_fail.py"
+    failing.write_text("def test_bad():\n    assert False\n", encoding="utf-8")
+
+    yaml_out = str(tmp_path / "fleet.yaml")
+    handle_fleet_init(output_path=yaml_out)
+
+    exit_code = handle_fleet_run(
+        test_files=[str(passing), str(failing)],
+        nodes_count=2,
+        shards="auto",
+        config_path=yaml_out,
+    )
+    assert exit_code == 1
 
 
 def test_scheduler_error_paths():

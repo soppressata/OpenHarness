@@ -3,10 +3,13 @@ Fleet Worker Node Engine ("The Immune System Worker").
 Handles node onboarding, local capability detection, heartbeat emission, and test execution.
 """
 
+import os
 import platform
+import subprocess
 import time
 import uuid
 import shutil
+import sys
 from typing import Dict, Optional, Any
 
 from .config import NodeCapability
@@ -87,20 +90,66 @@ class FleetWorker:
 
     def execute_test(self, test_spec_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Executes a test spec locally. Simulates or runs isolated test process and captures results.
+        Executes a test spec locally via an isolated pytest subprocess.
+
+        Returns a dict with status ``PASSED``, ``FAILED``, or ``INFRA_ERROR``,
+        captured output, and a duration. Missing files or subprocess errors are
+        reported as infrastructure errors so the fleet can retry them elsewhere.
         """
         test_id = test_spec_dict.get("test_id", "unknown-test")
         file_path = test_spec_dict.get("file_path", "test.py")
+        trace_id = test_spec_dict.get("trace_id", "")
 
         start = time.time()
-        duration = time.time() - start
+
+        if not os.path.exists(file_path):
+            duration = time.time() - start
+            return {
+                "test_id": test_id,
+                "node_id": self.node_id,
+                "status": "INFRA_ERROR",
+                "error_message": f"Test file not found: {file_path}",
+                "stack_trace": "",
+                "duration_seconds": duration,
+                "file_path": file_path,
+                "trace_id": trace_id,
+            }
+
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-m", "pytest", file_path, "-v", "--tb=short"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            duration = time.time() - start
+            output = f"{proc.stdout}\n{proc.stderr}".strip()
+            if proc.returncode == 0:
+                status = "PASSED"
+                error_message = ""
+                stack_trace = ""
+            else:
+                status = "FAILED"
+                error_message = output.splitlines()[-1] if output else "pytest failed"
+                stack_trace = output
+        except subprocess.TimeoutExpired:
+            duration = time.time() - start
+            status = "INFRA_ERROR"
+            error_message = f"Test timed out after 60s: {file_path}"
+            stack_trace = ""
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            duration = time.time() - start
+            status = "INFRA_ERROR"
+            error_message = f"Failed to execute test: {exc}"
+            stack_trace = ""
 
         return {
             "test_id": test_id,
             "node_id": self.node_id,
-            "status": "PASSED",
-            "error_message": "",
-            "stack_trace": "",
+            "status": status,
+            "error_message": error_message,
+            "stack_trace": stack_trace,
             "duration_seconds": duration,
             "file_path": file_path,
+            "trace_id": trace_id,
         }
