@@ -221,6 +221,8 @@ def test_cli_fleet_handlers(tmp_path):
         config_path=saved_path,
     )
     assert exit_code == 0
+    assert os.path.exists(tmp_path / ".fleet_checkpoint.json")
+    assert not os.path.exists(os.path.abspath(".fleet_checkpoint.json"))
 
     dash_state = handle_fleet_dashboard()
     assert "grid" in dash_state

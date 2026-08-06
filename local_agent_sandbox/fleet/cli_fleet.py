@@ -18,6 +18,12 @@ from .observability import FleetObservabilityDashboard, generate_trace_id
 CHECKPOINT_FILE = ".fleet_checkpoint.json"
 
 
+def _checkpoint_path(config_path: str) -> str:
+    """Return the checkpoint path associated with a fleet configuration."""
+    config_directory = os.path.dirname(os.path.abspath(config_path))
+    return os.path.join(config_directory, CHECKPOINT_FILE)
+
+
 def handle_fleet_init(cluster_name: str = "harness-fleet-primary", output_path: str = "fleet.yaml") -> str:
     """Generates fleet.yaml configuration file."""
     config = generate_default_config(cluster_name=cluster_name)
@@ -97,6 +103,7 @@ def handle_fleet_run(
     Returns 0 on success, non-zero on failure.
     """
     config = load_config(config_path)
+    checkpoint_path = _checkpoint_path(config_path)
     conductor = FleetConductor(config=config)
     scheduler = FleetScheduler()
     self_healing = FleetSelfHealingEngine(conductor=conductor)
@@ -116,9 +123,9 @@ def handle_fleet_run(
 
     completed_tests: Dict[str, Any] = {}
 
-    if resume and os.path.exists(CHECKPOINT_FILE):
+    if resume and os.path.exists(checkpoint_path):
         try:
-            with open(CHECKPOINT_FILE, "r", encoding="utf-8") as f:
+            with open(checkpoint_path, "r", encoding="utf-8") as f:
                 completed_tests = json.load(f)
             print(f"[HarnessFleet] Resuming run from checkpoint: {len(completed_tests)} tests previously completed.")
         except Exception:
@@ -237,7 +244,7 @@ def handle_fleet_run(
             self_healing.reconcile_result(res)
             completed_tests[spec.test_id] = res.to_dict()
 
-    with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
+    with open(checkpoint_path, "w", encoding="utf-8") as f:
         json.dump(completed_tests, f, indent=2)
 
     summary = self_healing.get_summary()

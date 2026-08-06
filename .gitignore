@@ -28,6 +28,7 @@ ENV/
 # OpenHarness local db & cache
 .openharness/
 *.db
+/.fleet_checkpoint.json
 
 # Node / JS
 node_modules/
