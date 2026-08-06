@@ -30,6 +30,13 @@ from .self_healing import (
     TestExecutionResult,
     ErrorType,
 )
+from .retry import (
+    FailureType,
+    classify_failure,
+    should_retry,
+    backoff_delay,
+    calculate_retry_delay,
+)
 from .observability import (
     FleetObservabilityDashboard,
     FailureFingerprinter,
@@ -63,6 +70,11 @@ __all__ = [
     "FleetSelfHealingEngine",
     "TestExecutionResult",
     "ErrorType",
+    "FailureType",
+    "classify_failure",
+    "should_retry",
+    "backoff_delay",
+    "calculate_retry_delay",
     "FleetObservabilityDashboard",
     "FailureFingerprinter",
     "FailureCluster",

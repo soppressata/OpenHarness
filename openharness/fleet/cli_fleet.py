@@ -5,6 +5,7 @@ Implements 'harness fleet' and 'lasb fleet' subcommand handlers for init, join, 
 
 import os
 import json
+import time
 from typing import List, Optional, Dict, Any
 
 from .config import load_config, save_config, generate_default_config, migrate_config
@@ -13,6 +14,7 @@ from .worker import FleetWorker
 from .scheduler import FleetScheduler, TestSpec
 from .self_healing import FleetSelfHealingEngine, TestExecutionResult, ErrorType
 from .observability import FleetObservabilityDashboard, generate_trace_id
+from .retry import calculate_retry_delay
 
 
 CHECKPOINT_FILE = ".fleet_checkpoint.json"
@@ -224,6 +226,16 @@ def handle_fleet_run(
                     trace_id=res.trace_id,
                 )
                 if should_retry and retry_node_id and retry_node_id != node_id:
+                    delay_seconds = calculate_retry_delay(
+                        strategy=config.retry_strategy,
+                        attempt=self_healing.retry_counts.get(spec.test_id, 1),
+                        base_delay_ms=config.base_delay_ms,
+                    )
+                    print(
+                        f"[HarnessFleet] Retrying test '{spec.test_id}' on node '{retry_node_id}' "
+                        f"in {delay_seconds:.2f}s (strategy={config.retry_strategy})..."
+                    )
+                    time.sleep(delay_seconds)
                     retry_worker = workers.get(retry_node_id)
                     if retry_worker is not None:
                         raw_res = retry_worker.execute_test(
