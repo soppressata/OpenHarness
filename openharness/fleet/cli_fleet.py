@@ -97,9 +97,12 @@ def handle_fleet_run(
     timeout: int = 300,
     resume: bool = False,
     config_path: str = "fleet.yaml",
+    ledger_path: Optional[str] = None,
 ) -> int:
     """
     Executes distributed test suite across fleet grid with scheduling, self-healing, and checkpointing.
+    When ``ledger_path`` is set, every completed result is also recorded into the
+    Harness Grid observer ledger (hash-chained, exactly-once) for byte-for-byte replay.
     Returns 0 on success, non-zero on failure.
     """
     config = load_config(config_path)
@@ -114,6 +117,12 @@ def handle_fleet_run(
     )
     dashboard = FleetObservabilityDashboard(conductor=conductor)
 
+    ledger = None
+    if ledger_path:
+        from openharness.grid.ledger import GridLedger, GridResult
+
+        ledger = GridLedger(ledger_path)
+
     workers: Dict[str, FleetWorker] = {}
     for i in range(nodes_count):
 
@@ -127,6 +136,21 @@ def handle_fleet_run(
         return 0
 
     completed_tests: Dict[str, Any] = {}
+
+    def record_completed(res: TestExecutionResult) -> None:
+        completed_tests[res.test_id] = res.to_dict()
+        if ledger is not None:
+            ledger.append(
+                GridResult(
+                    test_id=res.test_id,
+                    node_id=res.node_id,
+                    status=res.status,
+                    error_message=res.error_message,
+                    stack_trace=res.stack_trace,
+                    duration_seconds=res.duration_seconds,
+                    trace_id=res.trace_id,
+                )
+            )
 
     if resume and os.path.exists(checkpoint_path):
         try:
@@ -222,7 +246,7 @@ def handle_fleet_run(
                         )
                         if res.status == "PASSED":
                             self_healing.reconcile_result(res)
-                            completed_tests[spec.test_id] = res.to_dict()
+                            record_completed(res)
                             continue
                         dashboard.record_failure(
                             test_id=res.test_id,
@@ -233,12 +257,12 @@ def handle_fleet_run(
                         )
 
                 self_healing.reconcile_result(res)
-                completed_tests[spec.test_id] = res.to_dict()
+                record_completed(res)
                 failures += 1
                 continue
 
             self_healing.reconcile_result(res)
-            completed_tests[spec.test_id] = res.to_dict()
+            record_completed(res)
 
     with open(checkpoint_path, "w", encoding="utf-8") as f:
         json.dump(completed_tests, f, indent=2)

@@ -19,6 +19,14 @@ from openharness.fleet import (
     handle_fleet_run,
     handle_fleet_status,
 )
+from openharness.grid import (
+    handle_grid_init,
+    handle_grid_join,
+    handle_grid_leave,
+    handle_grid_replay,
+    handle_grid_status,
+    handle_grid_watch,
+)
 
 
 @click.group()
@@ -96,6 +104,61 @@ def fleet_dashboard() -> None:
 def fleet_migrate(source_file: Optional[str], output_path: str) -> None:
     """Migrate an existing OpenHarness configuration to fleet.yaml."""
     handle_fleet_migrate(source_file=source_file, output_path=output_path)
+
+
+@cli.group()
+def grid():
+    """Harness Grid: distributed multi-node test orchestration fabric."""
+    pass
+
+
+@grid.command("init")
+@click.option("--cluster-name", default="harness-grid-primary", show_default=True)
+@click.option("--output", "output_path", default="fleet.yaml", show_default=True)
+def grid_init(cluster_name: str, output_path: str) -> None:
+    """Generate a grid fleet.yaml configuration file (mesh bootstrap)."""
+    handle_grid_init(cluster_name=cluster_name, output_path=output_path)
+
+
+@grid.command("join")
+@click.option("--conductor", "conductor_address", default="127.0.0.1:9443", show_default=True)
+@click.option("--token", default=None, help="Short-lived worker enrollment token.")
+def grid_join(conductor_address: str, token: Optional[str]) -> None:
+    """Enroll the current host as a grid worker node."""
+    handle_grid_join(conductor_address=conductor_address, token=token)
+
+
+@grid.command("leave")
+@click.option("--node-id", required=True, help="Grid node identifier to decommission.")
+@click.option("--in-flight", "in_flight", multiple=True, help="In-flight shard ID to re-dispatch (repeatable).")
+@click.option("--config", "config_path", default="fleet.yaml", show_default=True)
+def grid_leave(node_id: str, in_flight: Tuple[str, ...], config_path: str) -> None:
+    """Decommission a node and re-dispatch its in-flight shards to healthy peers."""
+    handle_grid_leave(node_id=node_id, in_flight=list(in_flight) or None, config_path=config_path)
+
+
+@grid.command("status")
+@click.option("--config", "config_path", default="fleet.yaml", show_default=True)
+def grid_status(config_path: str) -> None:
+    """Display the current grid node health table."""
+    handle_grid_status(config_path=config_path)
+
+
+@grid.command("watch")
+@click.option("--iterations", default=1, show_default=True, type=click.IntRange(min=1))
+@click.option("--interval", default=1.0, show_default=True, type=click.FloatRange(min=0.0))
+@click.option("--config", "config_path", default="fleet.yaml", show_default=True)
+def grid_watch(iterations: int, interval: float, config_path: str) -> None:
+    """Watch grid health across heartbeat windows."""
+    handle_grid_watch(iterations=iterations, interval=interval, config_path=config_path)
+
+
+@grid.command("replay")
+@click.argument("spec", metavar="TEST@TIMESTAMP")
+@click.option("--ledger", "ledger_path", default=".openharness/grid/ledger.db", show_default=True)
+def grid_replay(spec: str, ledger_path: str) -> None:
+    """Replay a historical grid result byte-for-byte (<test_id>@<timestamp>)."""
+    handle_grid_replay(spec=spec, ledger_path=ledger_path)
 
 
 @cli.command()
