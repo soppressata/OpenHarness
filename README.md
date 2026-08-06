@@ -248,3 +248,19 @@ pytest -v
 
 ## 📄 License
 MIT License. Open-source for everyone.
+
+
+---
+
+## 📊 Global Reward Telemetry & Merit Ledger
+
+OpenHarness includes a built-in autonomic telemetry engine (`telemetry/`) that records loop events into an embedded SQLite Merit Ledger (`telemetry/merit.db`), dynamically tunes persona prompts via reward scoring, and digests daily activity into GitHub feedback reports.
+
+### Key Components
+
+- **Merit Ledger (`telemetry/merit_ledger.py`)**: Embedded SQLite database (`telemetry/merit.db`) tracking events across loop iterations with forward-compatible `schema_version` migrations.
+- **Canonical Event Categories (`telemetry/events.py`)**: Standardized enum `EventCategory` defining `issue_filed`, `pr_merged`, `qa_feedback`, `quota_rotation`, `human_correction`, `build_failure`, `human_intervention`, and `attestation`.
+- **HARVEST Directive Extractor (`telemetry/harvest.py`)**: Polls open PR comments via `gh` CLI for `HARVEST:` directives, extracts correction payloads, and records them as `human_correction` events.
+- **Reward Model Scoring (`telemetry/reward_model.py`)**: Evaluates persona metrics (merge success rate, feedback delta, plan adherence) each cycle and outputs drifting configuration overrides (`telemetry/overrides.json`), dynamically injecting prompt suffixes for personas such as `qa_tester`.
+- **Feedback Digest (`telemetry/feedback_digest.py`)**: Aggregates ledger events into `FEEDBACK.md` and pushes daily summaries via GitHub CLI.
+- **Feature Flag Gating**: Controlled by the `AUTOLOOP_FEATURES` environment variable or `features.json` (`telemetry.enabled`, default `true`). Setting to false turns all telemetry calls into no-ops.
