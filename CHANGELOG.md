@@ -11,5 +11,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+- **Feature**: `harness prune` command for local eval-database retention & cleanup (`--older-than`, `--run-id`, `--dry-run`), with full cascade deletion of metric scores, results, and trajectories.
+
 ## [0.1.0] - Initial Release
 - Basic functionality added.

@@ -172,6 +172,25 @@ harness ui
 ```
 Open `http://localhost:8501` in your browser.
 
+#### Retention & Cleanup
+Every run appends full results, metric scores, and step-by-step trajectories to the
+local database. To keep `.openharness/evals.db` from growing unboundedly, prune old
+runs by age or delete a single run by ID:
+
+```bash
+# Preview exactly what would be deleted (no changes)
+harness prune --older-than 30 --dry-run
+
+# Delete all runs older than 30 days
+harness prune --older-than 30
+
+# Delete a single run
+harness prune --run-id <RUN_ID>
+```
+
+Pruning fully cascades (metric scores, results, and trajectories are removed together),
+so no orphaned rows are left behind.
+
 ---
 
 ## 🤖 GitHub Actions CI
@@ -235,6 +254,7 @@ await harness.runCase(
   - `harness ui`: Start the FastAPI web dashboard.
   - `harness init`: Initialize a boilerplate evaluation script.
   - `harness init --ci github`: Scaffold a GitHub Actions CI workflow template.
+  - `harness prune`: Prune old evaluation runs (`--older-than <days>` or `--run-id`) to reclaim database space.
 
 ---
 

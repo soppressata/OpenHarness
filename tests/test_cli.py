@@ -24,6 +24,14 @@ def test_cli_init(tmp_path, monkeypatch):
     assert (tmp_path / "harness_example.py").exists()
 
 
+def test_cli_prune_wiring(tmp_path):
+    db_file = str(tmp_path / "prune_wiring.db")
+    runner = CliRunner()
+    result = runner.invoke(cli, ["prune", "--older-than", "30", "--dry-run", "--db", db_file])
+    assert result.exit_code == 0
+    assert "Nothing to prune" in result.output
+
+
 def test_cli_viz_command(tmp_path):
     db_file = str(tmp_path / "viz.db")
     h = Harness(name="Viz Run", db_path=db_file)
