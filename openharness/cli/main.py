@@ -4,12 +4,21 @@ Provides core functionality for the main subsystem.
 """
 import os
 import sys
+from typing import Optional, Tuple
 import click
 from openharness.core.storage import StorageEngine
 from openharness.core.exporters import export_to_json, export_to_html, export_to_junit_xml
 from openharness.core.visualizations import render_ascii_waterfall, render_ascii_scorecard, render_ascii_quality_radar
 from openharness.core.synthetic import generate_synthetic_dataset
 from openharness.ci_generator import generate_github_actions_yaml
+from local_agent_sandbox.fleet import (
+    handle_fleet_dashboard,
+    handle_fleet_init,
+    handle_fleet_join,
+    handle_fleet_migrate,
+    handle_fleet_run,
+    handle_fleet_status,
+)
 
 
 @click.group()
@@ -17,6 +26,76 @@ from openharness.ci_generator import generate_github_actions_yaml
 def cli():
     """OpenHarness CLI - Zero-Cost, Local-First Agentic Harness Evaluator."""
     pass
+
+
+@cli.group()
+def fleet():
+    """Manage and run tests on a HarnessFleet grid."""
+    pass
+
+
+@fleet.command("init")
+@click.option("--cluster-name", default="harness-fleet-primary", show_default=True)
+@click.option("--output", "output_path", default="fleet.yaml", show_default=True)
+def fleet_init(cluster_name: str, output_path: str) -> None:
+    """Generate a fleet.yaml configuration file."""
+    handle_fleet_init(cluster_name=cluster_name, output_path=output_path)
+
+
+@fleet.command("join")
+@click.option("--conductor", "conductor_address", default="127.0.0.1:9443", show_default=True)
+@click.option("--token", default=None, help="Short-lived worker enrollment token.")
+def fleet_join(conductor_address: str, token: Optional[str]) -> None:
+    """Enroll the current host as a Fleet worker."""
+    handle_fleet_join(conductor_address=conductor_address, token=token)
+
+
+@fleet.command("run")
+@click.argument("test_files", nargs=-1, type=click.Path(exists=True, dir_okay=False))
+@click.option("--shards", default="auto", show_default=True, help="Shard count or auto.")
+@click.option("--nodes", "nodes_count", default=4, show_default=True, type=click.IntRange(min=1))
+@click.option("--timeout", default=300, show_default=True, type=click.IntRange(min=1))
+@click.option("--resume", is_flag=True, help="Resume from the last fleet checkpoint.")
+@click.option("--config", "config_path", default="fleet.yaml", show_default=True)
+def fleet_run(
+    test_files: Tuple[str, ...],
+    shards: str,
+    nodes_count: int,
+    timeout: int,
+    resume: bool,
+    config_path: str,
+) -> None:
+    """Run test files across the Fleet grid."""
+    exit_code = handle_fleet_run(
+        test_files=list(test_files) or None,
+        shards=shards,
+        nodes_count=nodes_count,
+        timeout=timeout,
+        resume=resume,
+        config_path=config_path,
+    )
+    if exit_code:
+        raise click.exceptions.Exit(exit_code)
+
+
+@fleet.command("status")
+def fleet_status() -> None:
+    """Display the current Fleet node health table."""
+    handle_fleet_status()
+
+
+@fleet.command("dashboard")
+def fleet_dashboard() -> None:
+    """Display a snapshot of Fleet telemetry and failure clusters."""
+    handle_fleet_dashboard()
+
+
+@fleet.command("migrate")
+@click.option("--source", "source_file", default=None, type=click.Path(exists=True, dir_okay=False))
+@click.option("--output", "output_path", default="fleet.yaml", show_default=True)
+def fleet_migrate(source_file: Optional[str], output_path: str) -> None:
+    """Migrate an existing OpenHarness configuration to fleet.yaml."""
+    handle_fleet_migrate(source_file=source_file, output_path=output_path)
 
 
 @cli.command()
