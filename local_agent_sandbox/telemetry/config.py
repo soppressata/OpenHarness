@@ -6,7 +6,11 @@ _OVERRIDE_ENABLED: Optional[bool] = None
 
 
 def is_telemetry_enabled() -> bool:
-    """Check if telemetry is enabled via environment variable or features.json."""
+    """Check if telemetry is enabled via environment variable or features.json.
+    
+    Returns:
+        bool: True if telemetry feature is enabled, False otherwise.
+    """
     global _OVERRIDE_ENABLED
     if _OVERRIDE_ENABLED is not None:
         return _OVERRIDE_ENABLED

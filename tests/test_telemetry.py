@@ -9,7 +9,7 @@ from local_agent_sandbox.enhancement_engineer import EnhancementEngineer
 from local_agent_sandbox.issue_resolver import IssueResolver
 from local_agent_sandbox.qa_resolver import QAResolver
 from local_agent_sandbox.qa_tester import QATester
-from telemetry import (
+from local_agent_sandbox.telemetry import (
     EventCategory,
     MeritLedger,
     generate_feedback_digest,
