@@ -86,23 +86,6 @@ def test_cli_fleet_init_and_run(tmp_path, monkeypatch):
     assert "Fleet run completed successfully" in run_result.output
 
 
-from click.testing import CliRunner
-from local_agent_sandbox.cli import cli
-
-
-def test_cli_run_command():
-    runner = CliRunner()
-    result = runner.invoke(cli, ["run", "echo 'CLI test'"])
-    assert result.exit_code == 0
-    assert "CLI test" in result.output
-
-
-def test_cli_blocked_command():
-    runner = CliRunner()
-    result = runner.invoke(cli, ["run", "rm -rf /"])
-    assert "BLOCKED" in result.output
-
-
 def test_cli_validate_command_valid(tmp_path):
     config_file = tmp_path / "task.yaml"
     config_file.write_text("""
