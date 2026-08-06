@@ -50,13 +50,13 @@ where = ["."]
 
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "local-agent-sandbox"
-version = "0.1.1"
-description = "Lightweight, sub-10ms local process sandbox for AI coding agents."
+name = "openharness"
+version = "0.1.3"
+description = "Zero-cost, local-first, privacy-focused evaluation harness for Agentic AI workflows."
 readme = "README.md"
 authors = [
     { name = "soppressata", email = "312807597+soppressata@users.noreply.github.com" }
@@ -64,39 +64,37 @@ authors = [
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: POSIX :: Linux",
-    "Topic :: Security",
-    "Topic :: Software Development :: Libraries"
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Testing",
 ]
+keywords = ["llm", "evals", "agent", "braintrust", "langsmith", "langfuse", "harness", "ollama", "vllm"]
 requires-python = ">=3.9"
 dependencies = [
     "pydantic>=2.0.0",
+    "httpx>=0.24.0",
     "click>=8.0.0",
-    "pyyaml>=6.0",
-    "cryptography>=42.0.0"
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "jinja2>=3.0.0"
 ]
 
 [project.optional-dependencies]
-memory = ["rmbr>=0.2.0"]
-
-[project.scripts]
-agent-sandbox = "local_agent_sandbox.cli:cli"
-sandboxctl = "local_agent_sandbox.cli:sandboxctl"
-lasb = "local_agent_sandbox.cli:main"
-harness = "local_agent_sandbox.cli:main"
-openharness = "local_agent_sandbox.cli:main"
-
-[tool.pytest.ini_options]
-minversion = "7.0"
-addopts = "-ra -q --cov=local_agent_sandbox --cov=telemetry"
-testpaths = ["tests"]
-filterwarnings = [
-    "ignore::pytest.PytestCollectionWarning",
-    "ignore::DeprecationWarning",
-    "ignore:.*regex.*:DeprecationWarning",
-    "ignore:.*FastAPI.*:DeprecationWarning"
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0"
 ]
 
+[project.scripts]
+harness = "openharness.cli.main:cli"
+openharness = "openharness.cli.main:cli"
+
+[project.entry-points."pytest11"]
+openharness = "openharness.plugins.pytest_plugin"
+
 [tool.setuptools.packages.find]
-include = ["local_agent_sandbox*", "telemetry*"]
+where = ["."]
