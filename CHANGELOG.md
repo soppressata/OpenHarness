@@ -1,3 +1,4 @@
+- **Feature**: Cross-Boundary Test Mesh — federated execution grid, self-healing Cortex, Black Box replay, and Commons intelligence fabric (`openharness.mesh`, `harness mesh demo`)
 - **Feature**: Add GitHub Actions CI template generator (Issue #32)
 - **Feature**: Add OpenAI-compatible scoring judge (Issue #31)
 - **Feature**: Export dashboard as static HTML snapshot (Issue #29)

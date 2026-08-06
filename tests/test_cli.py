@@ -58,3 +58,21 @@ def test_cli_init_github():
 def test_generate_ci_template_invalid():
     with pytest.raises(ValueError, match="Unsupported CI provider"):
         generate_ci_template("unsupported_provider")
+
+
+def test_cli_fleet_init_and_run(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+
+    init_result = runner.invoke(cli, ["fleet", "init"])
+    assert init_result.exit_code == 0
+    assert (tmp_path / "fleet.yaml").exists()
+
+    test_file = tmp_path / "test_example.py"
+    test_file.write_text("def test_example():\n    assert True\n", encoding="utf-8")
+    run_result = runner.invoke(
+        cli,
+        ["fleet", "run", "--nodes", "1", "--config", "fleet.yaml", str(test_file)],
+    )
+    assert run_result.exit_code == 0
+    assert "Fleet run completed successfully" in run_result.output

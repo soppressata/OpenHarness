@@ -4,12 +4,21 @@ Provides core functionality for the main subsystem.
 """
 import os
 import sys
+from typing import Optional, Tuple
 import click
 from openharness.core.storage import StorageEngine
 from openharness.core.exporters import export_to_json, export_to_html, export_to_junit_xml
 from openharness.core.visualizations import render_ascii_waterfall, render_ascii_scorecard, render_ascii_quality_radar
 from openharness.core.synthetic import generate_synthetic_dataset
 from openharness.ci_generator import generate_github_actions_yaml
+from openharness.fleet import (
+    handle_fleet_dashboard,
+    handle_fleet_init,
+    handle_fleet_join,
+    handle_fleet_migrate,
+    handle_fleet_run,
+    handle_fleet_status,
+)
 
 
 @click.group()
@@ -17,6 +26,76 @@ from openharness.ci_generator import generate_github_actions_yaml
 def cli():
     """OpenHarness CLI - Zero-Cost, Local-First Agentic Harness Evaluator."""
     pass
+
+
+@cli.group()
+def fleet():
+    """Manage and run tests on a HarnessFleet grid."""
+    pass
+
+
+@fleet.command("init")
+@click.option("--cluster-name", default="harness-fleet-primary", show_default=True)
+@click.option("--output", "output_path", default="fleet.yaml", show_default=True)
+def fleet_init(cluster_name: str, output_path: str) -> None:
+    """Generate a fleet.yaml configuration file."""
+    handle_fleet_init(cluster_name=cluster_name, output_path=output_path)
+
+
+@fleet.command("join")
+@click.option("--conductor", "conductor_address", default="127.0.0.1:9443", show_default=True)
+@click.option("--token", default=None, help="Short-lived worker enrollment token.")
+def fleet_join(conductor_address: str, token: Optional[str]) -> None:
+    """Enroll the current host as a Fleet worker."""
+    handle_fleet_join(conductor_address=conductor_address, token=token)
+
+
+@fleet.command("run")
+@click.argument("test_files", nargs=-1, type=click.Path(exists=True, dir_okay=False))
+@click.option("--shards", default="auto", show_default=True, help="Shard count or auto.")
+@click.option("--nodes", "nodes_count", default=4, show_default=True, type=click.IntRange(min=1))
+@click.option("--timeout", default=300, show_default=True, type=click.IntRange(min=1))
+@click.option("--resume", is_flag=True, help="Resume from the last fleet checkpoint.")
+@click.option("--config", "config_path", default="fleet.yaml", show_default=True)
+def fleet_run(
+    test_files: Tuple[str, ...],
+    shards: str,
+    nodes_count: int,
+    timeout: int,
+    resume: bool,
+    config_path: str,
+) -> None:
+    """Run test files across the Fleet grid."""
+    exit_code = handle_fleet_run(
+        test_files=list(test_files) or None,
+        shards=shards,
+        nodes_count=nodes_count,
+        timeout=timeout,
+        resume=resume,
+        config_path=config_path,
+    )
+    if exit_code:
+        raise click.exceptions.Exit(exit_code)
+
+
+@fleet.command("status")
+def fleet_status() -> None:
+    """Display the current Fleet node health table."""
+    handle_fleet_status()
+
+
+@fleet.command("dashboard")
+def fleet_dashboard() -> None:
+    """Display a snapshot of Fleet telemetry and failure clusters."""
+    handle_fleet_dashboard()
+
+
+@fleet.command("migrate")
+@click.option("--source", "source_file", default=None, type=click.Path(exists=True, dir_okay=False))
+@click.option("--output", "output_path", default="fleet.yaml", show_default=True)
+def fleet_migrate(source_file: Optional[str], output_path: str) -> None:
+    """Migrate an existing OpenHarness configuration to fleet.yaml."""
+    handle_fleet_migrate(source_file=source_file, output_path=output_path)
 
 
 @cli.command()
@@ -220,6 +299,160 @@ if __name__ == "__main__":
             click.echo("Commit it and push to run OpenHarness evals in GitHub Actions.")
         else:
             click.echo(f"File {path} already exists.")
+
+
+@cli.group()
+def mesh():
+    """Test Mesh: federated execution, self-healing, black-box, commons."""
+    pass
+
+
+@mesh.command("demo")
+@click.option("--root", default=".openharness/mesh-demo", help="Working directory for the demo mesh.")
+def mesh_demo(root):
+    """Mesh in 15 minutes: two clusters on one laptop, federated suite (AC-24)."""
+    import json
+    from pathlib import Path
+    from openharness.mesh import (
+        PeerIdentity,
+        RendezvousStore,
+        TestMesh,
+        MeshPolicy,
+        SuiteResult,
+        verify_manifest,
+        TestGenomeRecipe,
+        TestRunOutcome,
+    )
+
+    root_path = Path(root)
+    dht = RendezvousStore(root_path / "dht")
+    commons = root_path / "commons"
+
+    origin = TestMesh(
+        PeerIdentity.generate(cluster_id="org-a", region="us-east", capabilities={"gpu": False, "os": "linux"}),
+        rendezvous=dht,
+        policy=MeshPolicy(
+            project_id="org-a",
+            telemetry_consent=True,
+            data_residency="global",
+            allowed_regions=["*"],
+        ),
+        commons_root=commons,
+    )
+    executor = TestMesh(
+        PeerIdentity.generate(cluster_id="org-b", region="eu-west", capabilities={"gpu": False, "os": "linux"}),
+        rendezvous=dht,
+        policy=MeshPolicy(project_id="org-b", data_residency="global", allowed_regions=["*"]),
+        commons_root=commons,
+    )
+
+    origin.announce(latency_ms_estimate=5.0)
+    executor.announce(latency_ms_estimate=12.0)
+    origin.advertise_suite("demo-suite", name="Mesh Demo Suite", metadata={"tests": 2})
+
+    peers = origin.discover_peers()
+    click.secho(f"Discovered {len(peers)} peer(s) via rendezvous (no central coordinator)", fg="cyan")
+    for p in peers:
+        click.echo(f"  - {p.peer_id[:12]}… region={p.region} cluster={p.cluster_id}")
+
+    selected = origin.select_executor(required_capabilities={"os": "linux"})
+    if not selected:
+        click.secho("No capable peer found", fg="red")
+        raise SystemExit(1)
+    click.secho(f"Geo-optimal executor: region={selected.region} latency_ms={selected.latency_ms_estimate}", fg="green")
+
+    results = [
+        SuiteResult(test_id="test_alpha", status="passed", duration_ms=12.0),
+        SuiteResult(test_id="test_beta", status="passed", duration_ms=8.0),
+    ]
+    manifest = origin.run_on_peer(executor, "demo-suite", results, suite_name="Mesh Demo Suite")
+    ok, errors = verify_manifest(
+        manifest,
+        origin.identity.export_verification_material(),
+        executor.identity.export_verification_material(),
+    )
+    click.secho(
+        f"Dual-signed manifest {manifest.manifest_id[:12]}… verifiable={ok} errors={errors}",
+        fg="green" if ok else "red",
+    )
+
+    # Air-gapped path
+    bundle = origin.pack_airgapped(
+        "airgap-suite",
+        [{"id": "offline_1"}, {"id": "offline_2"}],
+        suite_name="Airgap Demo",
+    )
+    air_manifest = executor.execute_airgapped(bundle)
+    click.secho(f"Air-gapped execution signed by executor; results={len(air_manifest.results)}", fg="green")
+
+    # Cortex flake quarantine demo
+    for i in range(5):
+        origin.record_outcome(TestRunOutcome(test_id="flaky_demo", passed=(i % 2 == 0)))
+    decision = origin.record_outcome(TestRunOutcome(test_id="flaky_demo", passed=False))
+    if decision:
+        click.secho(f"Cortex decision: {decision.action} conf={decision.confidence:.2f} — {decision.reason}", fg="yellow")
+
+    # Black box capture + replay
+    rec = origin.capture("blackbox_demo")
+    rec.syscall("open", path="/tmp/x")
+    rec.network("connect", host="127.0.0.1", port=443)
+    recording = rec.finalize(output="ok", passed=True)
+    replayed = origin.replay(recording)
+    diff = origin.diff_recordings(recording, replayed)
+    click.secho(f"Black Box replay identical={diff['identical']} cause={diff['cause']}", fg="green")
+
+    # Commons recipe
+    recipe = TestGenomeRecipe(
+        name="demo-fixtures",
+        version="1.0.0",
+        pattern={"suite": "UserService"},
+        tags=["service", "fixtures"],
+        metrics={"runtime_reduction_pct": 43},
+    )
+    origin.publish_recipe(recipe)
+    tips = origin.recommendations({"suite": "UserService", "tags": ["service"], "pattern": {"suite": "UserService"}})
+    if tips:
+        click.secho(f"Commons recommendation: {tips[0]['action']} (score={tips[0]['score']})", fg="cyan")
+
+    health = origin.health()
+    click.echo(json.dumps({"health": health, "manifest_digest": manifest.content_digest()[:16]}, indent=2))
+    click.secho("\n✅ Mesh demo complete — federated suite passed.", fg="green", bold=True)
+
+
+@mesh.command("manifest")
+@click.option("--suite-id", required=True, help="Suite identifier.")
+@click.option("--out", default="run-manifest.json", help="Output path for signed manifest.")
+@click.option("--region", default="local", help="Peer region label.")
+def mesh_manifest(suite_id, out, region):
+    """Emit a signed run manifest (Phase 0 exit criterion)."""
+    from openharness.mesh import PeerIdentity, TestMesh, SuiteResult
+
+    node = TestMesh(PeerIdentity.generate(region=region))
+    manifest = node.emit_signed_run_manifest(
+        suite_id,
+        [SuiteResult(test_id="placeholder", status="passed")],
+        path=out,
+    )
+    click.secho(f"Wrote signed manifest {manifest.manifest_id} -> {out}", fg="green")
+    click.echo(f"peer_id={node.identity.peer_id}")
+    click.echo(f"digest={manifest.content_digest()}")
+
+
+@mesh.command("health")
+@click.option("--root", default=".openharness/mesh/dht", help="Rendezvous root.")
+@click.option("--region", default="local")
+def mesh_health(root, region):
+    """Show mesh health, quarantine decisions, and telemetry consent (AC-23)."""
+    import json
+    from openharness.mesh import PeerIdentity, TestMesh, RendezvousStore, MeshPolicy
+
+    node = TestMesh(
+        PeerIdentity.generate(region=region),
+        rendezvous=RendezvousStore(root),
+        policy=MeshPolicy(data_residency="global"),
+    )
+    node.announce()
+    click.echo(json.dumps(node.health(), indent=2))
 
 
 def main():
