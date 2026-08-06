@@ -83,3 +83,16 @@ Export JUnit XML or HTML report for CI/CD:
 ```bash
 harness export --run-id <RUN_ID> --format html --out report.html
 ```
+
+### Retention & Cleanup
+
+Every run appends results, metric scores, and trajectories to the local database.
+Prune old runs by age or delete a single run by ID to keep it lean:
+
+```bash
+harness prune --older-than 30 --dry-run   # preview what would be deleted
+harness prune --older-than 30             # delete runs older than 30 days
+harness prune --run-id <RUN_ID>           # delete a single run
+```
+
+Pruning cascades fully (metric scores, results, and trajectories are removed together).

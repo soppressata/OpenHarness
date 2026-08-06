@@ -4,7 +4,9 @@ Provides core functionality for the main subsystem.
 """
 import os
 import sys
-from typing import Optional, Tuple
+import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 import click
 from openharness.core.storage import StorageEngine
 from openharness.core.exporters import export_to_json, export_to_html, export_to_junit_xml
@@ -197,6 +199,56 @@ def report(db):
                     m_symbol = "  └─ ✔" if m["passed"] else "  └─ ✖"
                     click.echo(f"    {m_symbol} [{m['category']}] {m['name']}: {m['reason']}")
         click.echo("-" * 65)
+
+
+def _prune_targets(storage, older_than: Optional[float], run_id: Optional[str]) -> List[Dict[str, Any]]:
+    """Return the runs that ``harness prune`` would delete for the given options."""
+    if older_than is not None:
+        cutoff = time.time() - older_than * 86400.0
+        return [r for r in storage.get_runs(limit=100000) if r["timestamp"] < cutoff]
+    if run_id is not None:
+        details = storage.get_run_details(run_id)
+        return [details] if details else []
+    return []
+
+
+@cli.command()
+@click.option("--older-than", type=float, help="Delete runs older than this many days (float allowed).")
+@click.option("--run-id", help="Delete a single evaluation run by ID.")
+@click.option("--dry-run", is_flag=True, help="List runs that would be deleted without deleting anything.")
+@click.option("--db", default=".openharness/evals.db", help="Path to SQLite evals database.")
+def prune(older_than, run_id, dry_run, db):
+    """Prune old evaluation runs from the database to reclaim space."""
+    if older_than is not None and run_id is not None:
+        raise click.UsageError("Use either --older-than or --run-id, not both.")
+    if older_than is None and run_id is None:
+        raise click.UsageError("Provide either --older-than or --run-id.")
+
+    storage = StorageEngine(db_path=db)
+    targets = _prune_targets(storage, older_than, run_id)
+
+    if not targets:
+        click.echo("Nothing to prune.")
+        return
+
+    click.echo(f"Runs to prune: {len(targets)}")
+    for run in targets:
+        ts = datetime.fromtimestamp(run["timestamp"]).strftime("%Y-%m-%d %H:%M:%S")
+        age_days = (time.time() - run["timestamp"]) / 86400.0
+        click.echo(f"  {run['id']} | {run['name']} | {ts} | {age_days:.1f} days old")
+
+    if dry_run:
+        click.echo("Dry run: no changes made.")
+        return
+
+    if older_than is not None:
+        cutoff = time.time() - older_than * 86400.0
+        deleted = storage.delete_runs_before(cutoff)
+    else:
+        storage.delete_run(run_id)
+        deleted = 1
+
+    click.echo(f"Pruned {deleted} run(s) from {db}.")
 
 
 @cli.command()

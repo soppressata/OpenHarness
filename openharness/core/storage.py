@@ -37,6 +37,15 @@ class StorageEngine(metaclass=abc.ABCMeta):
     def delete_run(self, run_id: str):
         pass
 
+    @abc.abstractmethod
+    def delete_runs_before(self, timestamp: float) -> int:
+        """Delete all runs older than ``timestamp`` (epoch seconds).
+
+        Returns the number of runs deleted. Runs whose timestamp is exactly
+        equal to ``timestamp`` are kept (only strictly older runs are pruned).
+        """
+        pass
+
 
 class SQLiteStorage:
     """Embedded SQLite storage engine with WAL mode and busy_timeout."""
@@ -254,13 +263,32 @@ class SQLiteStorage:
             run_dict["results"] = results
             return run_dict
 
+    def _delete_run_cascade(self, cursor, run_id: str) -> None:
+        """Delete a run and every row that references it (metrics, results, trajectories)."""
+        cursor.execute("DELETE FROM metric_scores WHERE evaluation_result_id IN (SELECT id FROM evaluation_results WHERE run_id = ?)", (run_id,))
+        cursor.execute("DELETE FROM trajectories WHERE id IN (SELECT trajectory_id FROM evaluation_results WHERE run_id = ? AND trajectory_id IS NOT NULL)", (run_id,))
+        cursor.execute("DELETE FROM evaluation_results WHERE run_id = ?", (run_id,))
+        cursor.execute("DELETE FROM runs WHERE id = ?", (run_id,))
+
     def delete_run(self, run_id: str):
         with self._connection() as conn:
             with conn:
+                self._delete_run_cascade(conn.cursor(), run_id)
+
+    def delete_runs_before(self, timestamp: float) -> int:
+        """Delete all runs older than ``timestamp`` (epoch seconds), cascading fully.
+
+        Returns the number of runs deleted. Only runs strictly older than the
+        timestamp are pruned; a run whose timestamp equals the threshold is kept.
+        """
+        with self._connection() as conn:
+            with conn:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM metric_scores WHERE evaluation_result_id IN (SELECT id FROM evaluation_results WHERE run_id = ?)", (run_id,))
-                cursor.execute("DELETE FROM evaluation_results WHERE run_id = ?", (run_id,))
-                cursor.execute("DELETE FROM runs WHERE id = ?", (run_id,))
+                cursor.execute("SELECT id FROM runs WHERE timestamp < ?", (timestamp,))
+                run_ids = [row[0] for row in cursor.fetchall()]
+                for run_id in run_ids:
+                    self._delete_run_cascade(cursor, run_id)
+                return len(run_ids)
 
 
 class PostgresStorage:
@@ -496,13 +524,33 @@ class PostgresStorage:
                 run_dict["results"] = results
                 return run_dict
 
+    def _delete_run_cascade(self, cursor, run_id: str) -> None:
+        """Delete a run and every row that references it (metrics, results, trajectories)."""
+        cursor.execute("DELETE FROM metric_scores WHERE evaluation_result_id IN (SELECT id FROM evaluation_results WHERE run_id = %s)", (run_id,))
+        cursor.execute("DELETE FROM trajectories WHERE id IN (SELECT trajectory_id FROM evaluation_results WHERE run_id = %s AND trajectory_id IS NOT NULL)", (run_id,))
+        cursor.execute("DELETE FROM evaluation_results WHERE run_id = %s", (run_id,))
+        cursor.execute("DELETE FROM runs WHERE id = %s", (run_id,))
+
     def delete_run(self, run_id: str):
         with self._get_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM metric_scores WHERE evaluation_result_id IN (SELECT id FROM evaluation_results WHERE run_id = %s)", (run_id,))
-                cursor.execute("DELETE FROM evaluation_results WHERE run_id = %s", (run_id,))
-                cursor.execute("DELETE FROM runs WHERE id = %s", (run_id,))
+                self._delete_run_cascade(cursor, run_id)
             conn.commit()
+
+    def delete_runs_before(self, timestamp: float) -> int:
+        """Delete all runs older than ``timestamp`` (epoch seconds), cascading fully.
+
+        Returns the number of runs deleted. Only runs strictly older than the
+        timestamp are pruned; a run whose timestamp equals the threshold is kept.
+        """
+        with self._get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT id FROM runs WHERE timestamp < %s", (timestamp,))
+                run_ids = [row[0] for row in cursor.fetchall()]
+                for run_id in run_ids:
+                    self._delete_run_cascade(cursor, run_id)
+            conn.commit()
+            return len(run_ids)
 
 
 StorageEngine.register(SQLiteStorage)
