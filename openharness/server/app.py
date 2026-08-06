@@ -35,12 +35,7 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
         details = storage.get_run_details(run_id)
         if not details:
             raise HTTPException(status_code=404, detail="Run not found")
-        with storage._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM metric_scores WHERE evaluation_result_id IN (SELECT id FROM evaluation_results WHERE run_id = ?)", (run_id,))
-            cursor.execute("DELETE FROM evaluation_results WHERE run_id = ?", (run_id,))
-            cursor.execute("DELETE FROM runs WHERE id = ?", (run_id,))
-            conn.commit()
+        storage.delete_run(run_id)
         return {"status": "success", "deleted_run_id": run_id}
 
     @app.get("/api/runs/{run_id}/export")

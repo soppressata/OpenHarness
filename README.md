@@ -123,7 +123,9 @@ await harness.runCase(
 
 ## 🏗️ Architecture & Storage
 
-- **Trace Store**: Embedded SQLite database automatically created at `.openharness/evals.db`.
+- **Trace Store**:
+  - **Local/Default SQLite**: An embedded SQLite database is automatically created at `.openharness/evals.db`. It is configured in **WAL (Write-Ahead Logging) mode** with a busy timeout of 5 seconds, ensuring high concurrency and safe parallel execution across multi-threaded or multi-process runner tasks (e.g. parallelized CI/CD pipelines).
+  - **Remote PostgreSQL**: For team collaboration and shared visibility across developers and automated CI/CD pipelines, you can connect to a shared PostgreSQL database. Set the `OPENHARNESS_DB_URL` environment variable to a valid PostgreSQL connection string (e.g. `postgresql://username:password@localhost:5432/openharness_db`). Make sure you have a PostgreSQL client installed (`pip install psycopg2-binary`).
 - **CLI Commands**:
   - `harness run`: Run evaluation suite.
   - `harness report`: Print terminal summary of past runs & scorecards.
