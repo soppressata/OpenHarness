@@ -10,6 +10,7 @@ import json
 import time
 import pytest
 from openharness.fleet import (
+    FleetConfig,
     NodeCapability,
     generate_default_config,
     save_config,
@@ -53,6 +54,36 @@ def test_config_serialization_and_migration(tmp_path):
     migrated = migrate_config(json_path)
     assert migrated.cluster_name == "migrated-json-cluster"
     assert migrated.heartbeat_interval == 10
+
+
+def test_config_retry_strategy_parsing_and_defaults(tmp_path):
+    """Config accepts retry_strategy/base_delay_ms and defaults to legacy static/immediate retry."""
+    default = FleetConfig()
+    assert default.retry_strategy == "static"
+    assert default.base_delay_ms == 0
+
+    cfg = FleetConfig.from_dict({"retry_strategy": "linear", "base_delay_ms": 250})
+    assert cfg.retry_strategy == "linear"
+    assert cfg.base_delay_ms == 250
+
+    cfg_path = str(tmp_path / "fleet_retry.yaml")
+    save_config(cfg, cfg_path)
+    loaded = load_config(cfg_path)
+    assert loaded.retry_strategy == "linear"
+    assert loaded.base_delay_ms == 250
+
+    from_yaml = FleetConfig.from_yaml(
+        "cluster_name: legacy-cluster\nheartbeat_interval: 5.0\n"
+    )
+    assert from_yaml.cluster_name == "legacy-cluster"
+    assert from_yaml.retry_strategy == "static"
+    assert from_yaml.base_delay_ms == 0
+
+    with pytest.raises(ValueError, match="retry_strategy"):
+        FleetConfig.from_dict({"retry_strategy": "cubic"})
+
+    with pytest.raises(ValueError, match="base_delay_ms"):
+        FleetConfig.from_dict({"base_delay_ms": -5})
 
 
 def test_conductor_registration_and_heartbeats():

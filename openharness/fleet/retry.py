@@ -9,6 +9,8 @@ import enum
 import time
 from typing import Tuple
 
+from .config import VALID_RETRY_STRATEGIES
+
 
 class FailureType(str, enum.Enum):
     """Classification of test failure types."""
@@ -91,7 +93,7 @@ def should_retry(
 
 
 def backoff_delay(attempt: int, base_delay: float = 1.0, max_delay: float = 30.0) -> float:
-    """Calculate exponential backoff delay.
+    """Calculate exponential backoff delay (kept for backward compatibility).
 
     Args:
         attempt: Current attempt number (0-indexed).
@@ -101,5 +103,56 @@ def backoff_delay(attempt: int, base_delay: float = 1.0, max_delay: float = 30.0
     Returns:
         Delay in seconds.
     """
-    delay = base_delay * (2 ** attempt)
-    return min(delay, max_delay)
+    return calculate_retry_delay(
+        strategy="exponential",
+        attempt=attempt + 1,
+        base_delay_ms=int(base_delay * 1000),
+        max_delay_ms=int(max_delay * 1000),
+    )
+
+
+def calculate_retry_delay(
+    strategy: str,
+    attempt: int,
+    base_delay_ms: int,
+    max_delay_ms: int = 60_000,
+) -> float:
+    """Calculate the delay in seconds before the next retry attempt.
+
+    Supports the three configured retry strategies:
+      - ``static``:      the delay is always ``base_delay_ms``.
+      - ``linear``:      the delay is ``base_delay_ms * attempt``.
+      - ``exponential``: the delay is ``base_delay_ms * 2 ** (attempt - 1)``.
+
+    The computed delay is capped at ``max_delay_ms``. A ``base_delay_ms`` of
+    ``0`` (the legacy default) always yields an immediate retry.
+
+    Args:
+        strategy: The retry strategy name, one of ``static``, ``linear``, or
+            ``exponential``.
+        attempt: The 1-indexed retry attempt number (1 = first retry).
+        base_delay_ms: Base delay in milliseconds for the configured strategy.
+        max_delay_ms: Upper bound for the computed delay in milliseconds.
+
+    Returns:
+        The planned delay in seconds.
+
+    Raises:
+        ValueError: If ``strategy`` is not a supported retry strategy.
+    """
+    if base_delay_ms <= 0:
+        return 0.0
+
+    if strategy == "static":
+        delay_ms = base_delay_ms
+    elif strategy == "linear":
+        delay_ms = base_delay_ms * attempt
+    elif strategy == "exponential":
+        delay_ms = base_delay_ms * (2 ** (attempt - 1))
+    else:
+        raise ValueError(
+            f"Unsupported retry strategy {strategy!r}. "
+            f"Must be one of {', '.join(VALID_RETRY_STRATEGIES)}."
+        )
+
+    return min(delay_ms, max_delay_ms) / 1000.0

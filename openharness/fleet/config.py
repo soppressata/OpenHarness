@@ -9,6 +9,8 @@ import re
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field, asdict
 
+VALID_RETRY_STRATEGIES = ("static", "linear", "exponential")
+
 
 @dataclass
 class NodeCapability:
@@ -35,6 +37,20 @@ class FleetConfig:
     timeout_seconds: int = 300
     retry_infra_failures: bool = True
     max_infra_retries: int = 3
+    retry_strategy: str = "static"
+    base_delay_ms: int = 0
+
+    def __post_init__(self) -> None:
+        """Validate retry configuration, defaulting to the legacy immediate-retry behavior."""
+        if self.retry_strategy not in VALID_RETRY_STRATEGIES:
+            raise ValueError(
+                f"Unsupported retry_strategy {self.retry_strategy!r}. "
+                f"Must be one of {', '.join(VALID_RETRY_STRATEGIES)}."
+            )
+        if not isinstance(self.base_delay_ms, int) or isinstance(self.base_delay_ms, bool):
+            raise ValueError("base_delay_ms must be an integer number of milliseconds")
+        if self.base_delay_ms < 0:
+            raise ValueError("base_delay_ms must be a non-negative number of milliseconds")
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
